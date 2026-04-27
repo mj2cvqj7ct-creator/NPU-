@@ -123,3 +123,43 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、実機の WASAPI/APO 統合前に検証できる Python ベースの
+オフライン処理プロトタイプを含めています。Spotify、Apple Music、
+YouTube Music などのアプリ内部には触れず、OS から取得した 48 kHz stereo
+PCM 相当の音声フレームに同一の後処理を適用する設計です。
+
+含まれる機能:
+
+- 20 ms フレームを想定したラウドネス追従ゲイン
+- ヘッドホン/小音量再生向けの 3 バンド EQ
+- true peak を超えない soft limiter
+- ONNX Runtime QNN Execution Provider を優先し、未導入環境では CPU DSP で動く
+  NPU 推論バックエンド抽象化
+- WAV ファイルでパイプラインを検証する CLI
+
+### 開発環境
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Snapdragon X 実機で QNN を試す場合は、Qualcomm/ONNX Runtime の実行環境を整えた
+うえで追加依存を導入します。
+
+```bash
+pip install -e ".[onnx]"
+```
+
+### WAV での検証
+
+```bash
+sxnpu-enhance-wav input.wav output.wav --preset balanced
+```
+
+`--preset quiet` は小音量再生向けに低域とボーカル帯域を少し強めます。
+`--disable-npu` を付けると、ONNX/QNN 探索を行わず CPU DSP のみで処理します。
