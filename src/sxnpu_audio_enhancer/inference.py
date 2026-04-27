@@ -118,6 +118,7 @@ def create_backend(model_path: str | Path | None = None) -> EnhancementBackend:
 
 
 NullInferenceBackend = IdentityBackend
+NoopInferenceBackend = IdentityBackend
 InferenceBackend = EnhancementBackend
 
 
