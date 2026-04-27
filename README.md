@@ -116,10 +116,27 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - Spotify、Apple Music、YouTube Music の推薦ランキングやアプリ内部ロジックの改変
 - すべての音源を無条件に派手に加工すること
 
+## 現在の実装
+
+このリポジトリには、実機 NPU 統合の前段として安全に検証できる Python の最小パイプラインがあります。
+
+- `src/snapdragon_npu_audio/frames.py`: 10 ms から 20 ms 程度の低遅延処理を想定した interleaved PCM フレーム表現
+- `src/snapdragon_npu_audio/dsp.py`: ラウドネス正規化、簡易トーン補正、ステレオ幅制御、true peak limiter
+- `src/snapdragon_npu_audio/backends.py`: QNN NPU、DirectML、CPU fallback の推論バックエンド選択境界
+- `src/snapdragon_npu_audio/wav_io.py`: WAV ファイルをフレーム化して DSP 検証するための入出力
+- `src/snapdragon_npu_audio/cli.py`: ローカル WAV を処理する検証 CLI
+
+```bash
+python -m snapdragon_npu_audio.cli input.wav output.wav --bass-boost 0.05 --vocal-clarity 0.05
+python -m snapdragon_npu_audio.cli --probe-backends
+```
+
+`SNAPDRAGON_NPU_AUDIO_BACKEND=qnn` を指定すると QNN backend を強制します。ONNX Runtime の `QNNExecutionProvider` が見つからない場合は明示的に失敗し、未指定時は DirectML、CPU fallback の順に安全な実行経路へ戻ります。
+
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
+- `src/inference/`: ONNX Runtime QNN model session and tensor conversion
 - `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- Windows ARM64 実機での QNN / DirectML provider 検証
+- APO 化または仮想オーディオデバイス化
