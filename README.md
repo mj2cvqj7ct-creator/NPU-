@@ -93,13 +93,31 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 ## 実装ロードマップ
 
-1. WASAPI loopback の最小プロトタイプを作る。
-2. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。
-3. ルールベースのラウドネス補正、EQ、limiter を追加する。
-4. ONNX Runtime QNN Execution Provider で ARM64 / Snapdragon X NPU 推論を試す。
-5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
-6. ローカル個人化プロファイルを暗号化保存する。
-7. APO 化または仮想オーディオデバイス化して常用できる形にする。
+1. WAV 入出力で検証できる DSP / 推論制御プロトタイプを作る。 (完了)
+2. WASAPI loopback の最小プロトタイプを作る。
+3. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。
+4. ルールベースのラウドネス補正、EQ、limiter を追加する。
+5. ONNX Runtime QNN Execution Provider で ARM64 / Snapdragon X NPU 推論を試す。
+6. NPU が使えない環境では DirectML または CPU fallback に切り替える。
+7. ローカル個人化プロファイルを暗号化保存する。
+8. APO 化または仮想オーディオデバイス化して常用できる形にする。
+
+## 現在のプロトタイプ
+
+このリポジトリには、Windows のリアルタイムキャプチャを実装する前段階として、標準ライブラリだけで動く WAV ベースの検証プロトタイプを含めています。
+
+```bash
+PYTHONPATH=src python3 -m npu_audio_enhancer input.wav output.wav --service spotify
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
+
+- `src/npu_audio_enhancer/audio.py`: stereo float PCM フレーム表現
+- `src/npu_audio_enhancer/inference.py`: NPU-ready な推論バックエンド抽象化と CPU fallback
+- `src/npu_audio_enhancer/pipeline.py`: adaptive loudness、低域/明瞭度補正、compression、limiter
+- `src/npu_audio_enhancer/profiles.py`: Spotify、Apple Music、YouTube Music 別の安全な補正プロファイル
+- `docs/snapdragon_x_npu_audio_architecture.md`: Snapdragon X / QNN 統合に向けた実装契約
+
+現時点の `npu` バックエンドは、QNN/ONNX Runtime QNN EP の統合前に NPU 使用を偽装しないための明示的な placeholder です。実機統合までは `auto` が CPU adaptive backend にフォールバックします。
 
 ## 評価指標
 
@@ -119,7 +137,7 @@ Snapdragon X では、以下の順で実装候補を検討します。
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
+- `src/npu_audio_enhancer/realtime.py`: 10-20 ms frame のリングバッファ処理
+- `src/npu_audio_enhancer/inference.py`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- `tests/`: WAV 入出力に加え、ストリーミング境界条件と遅延予算の自動テスト
