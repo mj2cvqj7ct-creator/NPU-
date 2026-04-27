@@ -10,9 +10,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Cursor Agent" }]
+dependencies = ["PySide6"]
 
 [project.scripts]
 npu-audio-enhancer = "npu_audio_enhancer.__main__:main"
+npu-audio-enhancer-gui = "npu_audio_enhancer.desktop:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

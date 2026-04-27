@@ -13,6 +13,7 @@ ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube
 - WAV 音声に対して、ピーク正規化、軽いダイナミックレンジ圧縮、ソフトクリップを適用します。
 - `--profile snapdragon-x-npu` で、Snapdragon X NPU ターゲットのプロファイルを選べます。
 - ローカル検証用のデモ WAV を生成できます。
+- デスクトップアプリからデモ生成、WAV 選択、音質向上処理を実行できます。
 
 ## セットアップ
 
@@ -22,11 +23,14 @@ python3 -m venv .venv
 python -m pip install -e .
 ```
 
+Linux で GUI を表示する場合は、Qt の xcb/EGL ランタイムライブラリが必要です。
+
 ## 実行例
 
 ```bash
 python3 -m npu_audio_enhancer --generate-demo demo_input.wav
 python3 -m npu_audio_enhancer demo_input.wav demo_enhanced.wav --profile snapdragon-x-npu
+npu-audio-enhancer-gui
 ```
 
 ## テスト
