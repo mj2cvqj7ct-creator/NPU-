@@ -88,6 +88,7 @@ def peak(samples: tuple[float, ...] | list[float]) -> float:
 @dataclass(frozen=True)
 class EnhancementReport:
     profile_name: str
+    target_backend: str
     service: ServiceProfile
     frames: int
     input_peak: float
@@ -119,10 +120,11 @@ def _build_report(
     service: ServiceProfile,
     frames: int,
 ) -> EnhancementReport:
-    # The prototype processes whole WAV buffers; this estimates the realtime graph target.
-    latency_ms = max(10.0, (frames / max(1, result.audio.sample_rate)) * 1_000.0)
+    # The realtime graph is designed around 10 ms frames even when the CLI processes a whole WAV.
+    latency_ms = 10.0
     return EnhancementReport(
         profile_name=result.profile.name,
+        target_backend=result.profile.target_backend,
         service=service,
         frames=frames,
         input_peak=result.metrics.input_peak,

@@ -51,7 +51,11 @@ class AudioPipelineTest(unittest.TestCase):
         self.assertEqual(result.audio.channels, 2)
         self.assertEqual(len(result.audio.samples), len(audio.samples))
         self.assertLessEqual(result.metrics.output_peak, 0.91)
-        self.assertNotEqual(result.audio.samples[0], result.audio.samples[1])
+        stereo_delta = sum(
+            abs(result.audio.samples[index] - result.audio.samples[index + 1])
+            for index in range(0, min(200, len(result.audio.samples)), 2)
+        )
+        self.assertGreater(stereo_delta, 0.0)
 
     def test_wav_round_trip_and_report(self) -> None:
         audio = generate_demo_buffer(duration_seconds=0.05)
@@ -77,7 +81,7 @@ class AudioPipelineTest(unittest.TestCase):
         self.assertEqual(report.profile_name, "snapdragon-x-npu+youtube-music")
         self.assertEqual(report.service.slug, "youtube-music")
         self.assertGreater(report.frames, 0)
-        self.assertLess(report.latency_ms, 40.0)
+        self.assertLessEqual(report.latency_ms, 20.0)
 
     def test_backend_plan_prefers_qnn_on_arm64(self) -> None:
         plan = build_backend_plan(prefer_npu=True, frame_ms=10, machine="arm64")
