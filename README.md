@@ -83,6 +83,25 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - サービス横断で「好みの音作り」を学習
 - 推薦サービスの内部ランキングは変更せず、ローカル体験のみを最適化
 
+## 現在のプロトタイプ
+
+このリポジトリには、実デバイス統合前に音質アルゴリズムを検証するための
+純 Python プロトタイプを含めています。
+
+- `src/dsp/enhancer.py`: ラウドネス正規化、3 バンド EQ、ステレオ幅制御、
+  トランジェント補正、true peak limiter の低遅延 DSP チェーン
+- `src/inference/runtime.py`: Snapdragon X / Windows ARM64 上では
+  ONNX Runtime QNN Execution Provider を優先し、それ以外では CPU
+  ヒューリスティックにフォールバックする推論ランタイム抽象化
+- `config/service_profiles.json`: Spotify、Apple Music、YouTube Music
+  向けの保守的な初期補正プロファイル
+- `tests/test_enhancer.py`: DSP チェーンとランタイム選択のオフライン検証
+
+プロトタイプはサービスのアプリや音源ストリームを改変せず、OS ミキサーから
+得た 48 kHz / 32-bit float stereo PCM ブロックに対して動作する前提です。
+NPU モデルは直接音声を生成せず、明瞭度、暖かさ、濁り抑制、過渡補正などの
+安全な制御値だけを DSP に渡します。
+
 ## サービス別の扱い
 
 | サービス | 直接改変 | 実現可能な改善 |
@@ -123,3 +142,9 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## ローカル検証
+
+```bash
+python -m unittest
+```

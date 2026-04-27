@@ -1,0 +1,40 @@
+{
+  "profiles": [
+    {
+      "service": "spotify",
+      "target_lufs": -16.0,
+      "max_gain_db": 6.0,
+      "bass_shelf_db": 1.2,
+      "presence_db": 1.4,
+      "air_db": 0.8,
+      "stereo_width": 1.04,
+      "limiter_ceiling_db": -1.0,
+      "transient_restore": 0.12,
+      "low_volume_compensation": 2.0
+    },
+    {
+      "service": "apple_music",
+      "target_lufs": -18.0,
+      "max_gain_db": 4.5,
+      "bass_shelf_db": 0.6,
+      "presence_db": 0.8,
+      "air_db": 0.9,
+      "stereo_width": 1.02,
+      "limiter_ceiling_db": -1.0,
+      "transient_restore": 0.08,
+      "low_volume_compensation": 1.5
+    },
+    {
+      "service": "youtube_music",
+      "target_lufs": -15.0,
+      "max_gain_db": 5.5,
+      "bass_shelf_db": 0.8,
+      "presence_db": 1.6,
+      "air_db": 0.7,
+      "stereo_width": 1.0,
+      "limiter_ceiling_db": -1.2,
+      "transient_restore": 0.1,
+      "low_volume_compensation": 2.5
+    }
+  ]
+}
