@@ -8,10 +8,37 @@ tests remain runnable on generic Linux CI hosts.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Protocol
 
 import numpy as np
+
+
+class BackendKind(str, Enum):
+    AUTO = "auto"
+    QNN = "qnn"
+    DIRECTML = "directml"
+    CPU = "cpu"
+
+
+class InferenceProvider(str, Enum):
+    AUTO = "auto"
+    QNN = "qnn"
+    DIRECTML = "directml"
+    CPU = "cpu"
+
+
+@dataclass(frozen=True)
+class InferenceConfig:
+    preferred_backend: BackendKind = BackendKind.AUTO
+    model_path: str | Path | None = None
+
+
+@dataclass(frozen=True)
+class InferenceResult:
+    eq_curve: tuple[float, float, float] | None = None
+    backend_name: str = "cpu"
 
 
 class EnhancementBackend(Protocol):
@@ -27,10 +54,15 @@ class EnhancementBackend(Protocol):
 class IdentityBackend:
     """Safe fallback when NPU inference is unavailable."""
 
-    name: str = "identity-cpu"
+    name: str = "cpu"
+    kind: BackendKind = BackendKind.CPU
 
     def enhance(self, frame: np.ndarray) -> np.ndarray:
         return np.asarray(frame, dtype=np.float32).copy()
+
+    def run(self, metrics: object) -> InferenceResult:
+        del metrics
+        return InferenceResult(backend_name=self.name)
 
 
 class OnnxRuntimeBackend:
@@ -59,6 +91,7 @@ class OnnxRuntimeBackend:
         self._input_name = self._session.get_inputs()[0].name
         self._output_name = self._session.get_outputs()[0].name
         self.name = "+".join(self._session.get_providers())
+        self.kind = BackendKind.QNN if "QNNExecutionProvider" in self.name else BackendKind.CPU
 
     def enhance(self, frame: np.ndarray) -> np.ndarray:
         batch = np.asarray(frame, dtype=np.float32)[None, ...]
@@ -82,3 +115,12 @@ def create_backend(model_path: str | Path | None = None) -> EnhancementBackend:
     if model_path is None:
         return IdentityBackend()
     return OnnxRuntimeBackend(model_path)
+
+
+NullInferenceBackend = IdentityBackend
+InferenceBackend = EnhancementBackend
+
+
+def create_inference_backend(config: InferenceConfig | None = None) -> EnhancementBackend:
+    config = config or InferenceConfig()
+    return create_backend(config.model_path)

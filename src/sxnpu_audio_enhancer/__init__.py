@@ -1,5 +1,11 @@
 """Snapdragon X NPU-aware audio enhancement prototype."""
 
-from .pipeline import AudioEnhancementPipeline, EnhancementConfig
+from .config import EnhancementConfig, EnhancerConfig
+from .pipeline import AudioEnhancementPipeline, AudioEnhancer
 
-__all__ = ["AudioEnhancementPipeline", "EnhancementConfig"]
+__all__ = [
+    "AudioEnhancer",
+    "AudioEnhancementPipeline",
+    "EnhancerConfig",
+    "EnhancementConfig",
+]

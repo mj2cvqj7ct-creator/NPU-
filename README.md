@@ -158,8 +158,9 @@ pip install -e ".[onnx]"
 ### WAV での検証
 
 ```bash
-sxnpu-enhance-wav input.wav output.wav --preset balanced
+sxnpu-enhance-wav input.wav output.wav --provider auto --target-lufs -16
 ```
 
-`--preset quiet` は小音量再生向けに低域とボーカル帯域を少し強めます。
-`--disable-npu` を付けると、ONNX/QNN 探索を行わず CPU DSP のみで処理します。
+`--provider qnn` は Snapdragon X の QNN Execution Provider を明示的に優先します。
+`--model model.onnx` を渡さない場合は CPU の identity 推論にフォールバックし、
+ルールベース DSP のみで安全に処理します。

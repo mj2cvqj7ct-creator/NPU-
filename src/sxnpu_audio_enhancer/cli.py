@@ -6,7 +6,7 @@ from pathlib import Path
 from sxnpu_audio_enhancer.config import EnhancerConfig
 from sxnpu_audio_enhancer.inference import InferenceProvider
 from sxnpu_audio_enhancer.pipeline import AudioEnhancementPipeline
-from sxnpu_audio_enhancer.wav_io import read_wav_float32, write_wav_float32
+from sxnpu_audio_enhancer.wav_io import read_wav, write_wav
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    sample_rate, audio = read_wav_float32(args.input)
+    sample_rate, audio = read_wav(args.input)
 
     config = EnhancerConfig(sample_rate=sample_rate, target_lufs=args.target_lufs)
     pipeline = AudioEnhancementPipeline(
@@ -50,7 +50,7 @@ def main() -> None:
         model_path=args.model,
     )
     enhanced = pipeline.process(audio)
-    write_wav_float32(args.output, sample_rate, enhanced)
+    write_wav(args.output, sample_rate, enhanced)
 
 
 if __name__ == "__main__":
