@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための CPU 検証可能なプロトタイプです。
 
 ## 重要な前提
 
@@ -15,6 +15,14 @@ ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube
 2. ARM64 Windows 上で CPU 消費を抑え、NPU 推論により低遅延なリアルタイム処理を実現する。
 3. ユーザーの聴取環境、ヘッドホン、音量、楽曲傾向に合わせて補正量を自動最適化する。
 4. 推薦アルゴリズムそのものではなく、ローカルの聴取履歴特徴から「好みの音作り」を推定する。
+
+## 現在入っているもの
+
+- 16-bit PCM WAV を読み書きするローカル検証用 CLI
+- Spotify、Apple Music、YouTube Music 向けのサービス別補正係数
+- ピーク正規化、簡易ラウドネス/トーン補正、コンプレッション、ステレオイメージ、true peak limiter
+- Snapdragon X NPU / ONNX Runtime QNN Execution Provider へ接続するための実行計画オブジェクト
+- 推薦ランキングを直接変更しない、ローカル聴取傾向からの「音作り」推定
 
 ## システム構成
 
@@ -100,6 +108,29 @@ Snapdragon X では、以下の順で実装候補を検討します。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
+
+## セットアップ
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+```
+
+## 実行例
+
+```bash
+python3 -m npu_audio_enhancer --generate-demo demo_input.wav
+python3 -m npu_audio_enhancer demo_input.wav demo_enhanced.wav --profile holographic-vocal-stage --service spotify
+python3 -m npu_audio_enhancer --plan --profile snapdragon-x-npu --service apple-music
+python3 -m npu_audio_enhancer --preference-demo
+```
+
+## テスト
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+```
 
 ## 評価指標
 

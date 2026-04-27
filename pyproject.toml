@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "npu-audio-enhancer"
+version = "0.1.0"
+description = "CPU-verifiable Snapdragon X NPU audio enhancement prototype."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Cursor Agent" }]
+dependencies = []
+
+[project.scripts]
+npu-audio-enhancer = "npu_audio_enhancer.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
