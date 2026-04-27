@@ -114,12 +114,18 @@ Snapdragon X では、以下の順で実装候補を検討します。
 実行例:
 
 ```bash
-python -m snapdragon_audio_enhancer.cli input.wav output.wav --service spotify
-python -m snapdragon_audio_enhancer.cli input.wav output.wav --service apple_music
-python -m snapdragon_audio_enhancer.cli input.wav output.wav --service youtube_music --backend qnn --enable-qnn --model model.onnx
+PYTHONPATH=src python3 -m snapdragon_audio_enhancer.cli input.wav output.wav --service spotify
+PYTHONPATH=src python3 -m snapdragon_audio_enhancer.cli input.wav output.wav --service apple_music
+PYTHONPATH=src python3 -m snapdragon_audio_enhancer.cli input.wav output.wav --service youtube_music --backend qnn --enable-qnn --model model.onnx
 ```
 
 `--enable-qnn` と `--model` を指定し、実行環境に ONNX Runtime QNN Execution Provider を導入した場合は Snapdragon X NPU 側の接続点を使います。未導入環境では CPU fallback が同じ `InferenceResult` 契約を返すため、DSP チェーンと評価テストを先に進められます。
+
+テスト:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
 
 ## 評価指標
 
