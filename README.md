@@ -38,6 +38,15 @@ python3 -m npu_audio_enhancer demo_input.wav demo_enhanced.wav --profile hologra
 npu-audio-enhancer-gui
 ```
 
+## Windows デスクトップショートカット
+
+Windows 実機のデスクトップにショートカットを作る場合は、PowerShell で次を実行します。
+
+```powershell
+py -m pip install -e .
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\create_desktop_shortcut.ps1
+```
+
 ## テスト
 
 ```bash
