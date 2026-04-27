@@ -1,0 +1,19 @@
+[project]
+name = "npu-audio-enhancer"
+version = "0.1.0"
+description = "Snapdragon X NPU-ready audio enhancement prototype for ARM64 Windows"
+requires-python = ">=3.11"
+authors = [{ name = "Cursor Automation" }]
+
+[project.scripts]
+npu-audio-enhancer = "npu_audio_enhancer.__main__:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
