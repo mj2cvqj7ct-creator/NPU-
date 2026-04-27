@@ -6,6 +6,7 @@ from unittest import mock
 
 from npu_audio_enhancer.audio import AudioBuffer, enhance_audio, generate_demo_buffer, read_wav, write_wav
 from npu_audio_enhancer.profiles import get_profile
+from npu_audio_enhancer.recommender import RecommendationEngine, build_demo_catalog, build_recommendation_status
 from npu_audio_enhancer.reports import build_status_text
 from npu_audio_enhancer.realtime import ServiceState, build_realtime_status
 
@@ -88,6 +89,25 @@ class AudioPipelineTest(unittest.TestCase):
         self.assertIn("holographic imaging", status)
         self.assertIn("XMOS USB DAC Driver Control Panel", status)
         self.assertIn("target 32 samples", status)
+
+    def test_recommendation_engine_ranks_unheard_tracks(self) -> None:
+        engine = RecommendationEngine(build_demo_catalog())
+        result = engine.recommend(
+            recent_track_ids=("spotify:aurora-drive", "apple:glass-voice"),
+            service_targets=("Spotify", "Apple Music", "YouTube Music"),
+            limit=3,
+        )
+
+        recommended_ids = [item.track.track_id for item in result.tracks]
+        status = build_recommendation_status(result)
+
+        self.assertEqual(len(result.tracks), 3)
+        self.assertNotIn("spotify:aurora-drive", recommended_ids)
+        self.assertIn("NPU target: Snapdragon X NPU", status)
+        self.assertIn("Realtime reflection: service queues, smart playlists, API sync payloads", status)
+        self.assertIn("Realtime update tick: #1", status)
+        self.assertIn("Top realtime picks:", status)
+        self.assertIn("Spotify / Apple Music / YouTube Music", status)
 
 
 if __name__ == "__main__":

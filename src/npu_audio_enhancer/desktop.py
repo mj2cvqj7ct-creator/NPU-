@@ -14,11 +14,13 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
 from .profiles import available_profiles
+from .recommender import build_recommendation_status, generate_recommendations
 from .realtime import ServiceState, build_realtime_status
 
 
@@ -26,7 +28,7 @@ class EnhancerWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("NPU Streaming Music Enhancer")
-        self.setMinimumSize(820, 520)
+        self.setMinimumSize(980, 720)
 
         self.profile_combo = QComboBox()
         self.profile_combo.addItems(sorted(available_profiles()))
@@ -45,26 +47,31 @@ class EnhancerWindow(QMainWindow):
         for checkbox in (self.spotify_check, self.apple_music_check, self.youtube_music_check):
             checkbox.setChecked(True)
 
+        self.recommendation_tick = 0
         self.npu_meter = QProgressBar()
         self.npu_meter.setRange(0, 100)
         self.npu_meter.setValue(100)
         self.npu_meter.setFormat("NPU target load: %p%")
-        self.state_label = QLabel("STATE: STANDBY / 実機接続待ち")
+        self.state_label = QLabel("STATE: STANDBY / 待機中")
         self.state_label.setObjectName("stateLabel")
         self.state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label = QLabel("リアルタイム配信音声の NPU 処理は待機中です。")
         self.status_label.setWordWrap(True)
+        self.status_label.setObjectName("statusLabel")
         self.result_label = QLabel(build_realtime_status(self._service_state(), active=False))
         self.result_label.setWordWrap(True)
         self.result_label.setObjectName("resultLabel")
+        self.recommendation_label = QLabel(build_recommendation_status(generate_recommendations()))
+        self.recommendation_label.setWordWrap(True)
+        self.recommendation_label.setObjectName("resultLabel")
 
         self._build_ui()
 
     def _build_ui(self) -> None:
         root = QWidget()
         outer = QVBoxLayout(root)
-        outer.setContentsMargins(28, 24, 28, 24)
-        outer.setSpacing(18)
+        outer.setContentsMargins(34, 30, 34, 30)
+        outer.setSpacing(20)
 
         title = QLabel("NPU Streaming Music Enhancer")
         title.setObjectName("titleLabel")
@@ -74,11 +81,24 @@ class EnhancerWindow(QMainWindow):
         )
         subtitle.setWordWrap(True)
         subtitle.setObjectName("subtitleLabel")
-        outer.addWidget(title)
-        outer.addWidget(subtitle)
+        hero = QFrame()
+        hero.setObjectName("heroCard")
+        hero_layout = QVBoxLayout(hero)
+        hero_layout.setContentsMargins(24, 22, 24, 22)
+        hero_layout.setSpacing(8)
+        hero_layout.addWidget(title)
+        hero_layout.addWidget(subtitle)
+        outer.addWidget(hero)
 
+        control_card = QFrame()
+        control_card.setObjectName("card")
+        control_layout = QVBoxLayout(control_card)
+        control_layout.setContentsMargins(22, 20, 22, 20)
+        control_layout.setSpacing(16)
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setVerticalSpacing(14)
+        form.setHorizontalSpacing(18)
         services = QHBoxLayout()
         services.addWidget(self.spotify_check)
         services.addWidget(self.apple_music_check)
@@ -88,65 +108,164 @@ class EnhancerWindow(QMainWindow):
         form.addRow("プロファイル", self.profile_combo)
         form.addRow("低レイテンシ出力", self.latency_combo)
         form.addRow("NPU 使用率目標", self.npu_meter)
-        outer.addLayout(form)
+        control_layout.addLayout(form)
 
         actions = QHBoxLayout()
         stop_button = QPushButton("停止")
+        stop_button.setObjectName("secondaryButton")
         stop_button.clicked.connect(self._stop_realtime)
-        start_button = QPushButton("リアルタイム NPU 処理を開始")
-        start_button.setObjectName("primaryButton")
-        start_button.clicked.connect(self._start_realtime)
+        self.start_button = QPushButton("リアルタイム NPU 処理を開始")
+        self.start_button.setObjectName("primaryButton")
+        self.start_button.clicked.connect(self._start_realtime)
+        self.recommend_button = QPushButton("Deep Learning AI レコメンドをリアルタイム反映")
+        self.recommend_button.setObjectName("accentButton")
+        self.recommend_button.clicked.connect(self._apply_recommendations)
         actions.addWidget(stop_button)
+        actions.addWidget(self.recommend_button)
         actions.addStretch(1)
-        actions.addWidget(start_button)
-        outer.addLayout(actions)
+        actions.addWidget(self.start_button)
+        control_layout.addLayout(actions)
+        outer.addWidget(control_card)
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        outer.addWidget(separator)
-        outer.addWidget(self.state_label)
-        outer.addWidget(self.status_label)
-        outer.addWidget(self.result_label)
+        telemetry_card = QFrame()
+        telemetry_card.setObjectName("card")
+        telemetry_layout = QVBoxLayout(telemetry_card)
+        telemetry_layout.setContentsMargins(22, 20, 22, 20)
+        telemetry_layout.setSpacing(12)
+        telemetry_layout.addWidget(self.state_label)
+        telemetry_layout.addWidget(self.status_label)
+        telemetry_layout.addWidget(self._scroll_panel(self.result_label, 168))
+        telemetry_layout.addWidget(self._scroll_panel(self.recommendation_label, 220))
+        outer.addWidget(telemetry_card)
         outer.addStretch(1)
 
         root.setStyleSheet(
             """
-            QWidget { font-size: 15px; }
-            #titleLabel { font-size: 28px; font-weight: 700; }
-            #subtitleLabel { color: #4b5563; }
-            QLineEdit, QComboBox {
-                min-height: 34px;
-                padding: 4px 8px;
+            QWidget {
+                background: #0f172a;
+                color: #e5e7eb;
+                font-size: 15px;
+            }
+            #heroCard {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #1e3a8a, stop:0.55 #312e81, stop:1 #0f172a);
+                border: 1px solid rgba(147, 197, 253, 0.35);
+                border-radius: 22px;
+            }
+            #card {
+                background: rgba(15, 23, 42, 0.92);
+                border: 1px solid #334155;
+                border-radius: 18px;
+            }
+            #titleLabel {
+                background: transparent;
+                color: #f8fafc;
+                font-size: 34px;
+                font-weight: 800;
+                letter-spacing: 0.4px;
+            }
+            #subtitleLabel {
+                background: transparent;
+                color: #bfdbfe;
+                font-size: 15px;
+            }
+            QLabel {
+                background: transparent;
+            }
+            QCheckBox {
+                background: transparent;
+                color: #e5e7eb;
+                spacing: 8px;
+            }
+            QComboBox {
+                background: #111827;
+                border: 1px solid #475569;
+                border-radius: 10px;
+                color: #f8fafc;
+                min-height: 38px;
+                padding: 4px 10px;
+            }
+            QProgressBar {
+                background: #111827;
+                border: 1px solid #475569;
+                border-radius: 10px;
+                color: #f8fafc;
+                min-height: 22px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background: #22d3ee;
+                border-radius: 9px;
             }
             QPushButton {
-                min-height: 36px;
-                padding: 6px 14px;
+                background: #1f2937;
+                border: 1px solid #475569;
+                border-radius: 12px;
+                color: #f8fafc;
+                min-height: 40px;
+                padding: 7px 16px;
             }
             #primaryButton {
                 background: #2563eb;
+                border: 1px solid #60a5fa;
                 color: white;
-                border-radius: 6px;
+                font-weight: 700;
+            }
+            #accentButton {
+                background: #7c3aed;
+                border: 1px solid #a78bfa;
+                color: white;
+                font-weight: 700;
+            }
+            #secondaryButton {
+                background: #111827;
+                color: #cbd5e1;
             }
             #stateLabel {
-                background: #dbeafe;
-                border: 1px solid #60a5fa;
-                border-radius: 8px;
-                color: #1e3a8a;
+                background: #172554;
+                border: 1px solid #38bdf8;
+                border-radius: 14px;
+                color: #bfdbfe;
                 font-size: 18px;
-                font-weight: 700;
-                padding: 10px;
+                font-weight: 800;
+                padding: 12px;
+            }
+            #statusLabel {
+                color: #cbd5e1;
             }
             #resultLabel {
-                background: #f3f4f6;
-                border: 1px solid #d1d5db;
-                border-radius: 8px;
+                background: #020617;
+                border: 1px solid #334155;
+                border-radius: 14px;
+                color: #dbeafe;
                 font-family: monospace;
                 line-height: 140%;
-                padding: 12px;
+                padding: 14px;
+            }
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #0f172a;
+                border-radius: 6px;
+                width: 10px;
+            }
+            QScrollBar::handle:vertical {
+                background: #475569;
+                border-radius: 5px;
             }
             """
         )
         self.setCentralWidget(root)
+
+    def _scroll_panel(self, content: QLabel, height: int) -> QScrollArea:
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setFixedHeight(height)
+        area.setFrameShape(QFrame.Shape.NoFrame)
+        area.setWidget(content)
+        return area
 
     def _service_state(self) -> ServiceState:
         return ServiceState(
@@ -165,6 +284,7 @@ class EnhancerWindow(QMainWindow):
             return
 
         self.state_label.setText("STATE: ACTIVE / リアルタイム処理中")
+        self.start_button.setText("リアルタイム NPU 処理中")
         self.status_label.setText(
             "リアルタイム NPU 処理を開始しました。実機では Windows ARM64 + "
             "Snapdragon X NPU + ONNX Runtime QNN + ASIO XMOS USB DAC 極小バッファへ接続します。"
@@ -172,9 +292,19 @@ class EnhancerWindow(QMainWindow):
         self.result_label.setText(build_realtime_status(self._service_state(), active=True))
 
     def _stop_realtime(self) -> None:
-        self.state_label.setText("STATE: STANDBY / 実機接続待ち")
+        self.state_label.setText("STATE: STANDBY / 待機中")
+        self.start_button.setText("リアルタイム NPU 処理を開始")
         self.status_label.setText("リアルタイム NPU 処理を停止しました。")
         self.result_label.setText(build_realtime_status(self._service_state(), active=False))
+
+    def _apply_recommendations(self) -> None:
+        self.recommendation_tick += 1
+        recommendations = generate_recommendations(update_id=self.recommendation_tick)
+        self.recommendation_label.setText(build_recommendation_status(recommendations))
+        self.status_label.setText(
+            f"Deep Learning AI レコメンドを更新しました (realtime tick #{self.recommendation_tick})。実機では Spotify / Apple Music / "
+            "YouTube Music のプレイリスト候補と次候補キューへリアルタイム反映します。"
+        )
 
 
 def create_app() -> QApplication:
