@@ -122,12 +122,12 @@ class NpuAssistModel:
         """Return DSP controls from metrics until a real model is configured."""
 
         peak_dbfs = float(getattr(metrics, "peak_dbfs"))
-        rms_dbfs = float(getattr(metrics, "rms_dbfs"))
+        rms_dbfs = float(getattr(metrics, "rms_lufs", getattr(metrics, "rms_dbfs", -120.0)))
         crest_db = peak_dbfs - rms_dbfs
         quiet = clamp((-18.0 - rms_dbfs) / 24.0, 0.0, 1.0)
         compressed = clamp((12.0 - crest_db) / 8.0, 0.0, 1.0)
         return {
-            "low_shelf_db": 0.7 * quiet,
+            "warmth_db": 0.7 * quiet,
             "clarity_db": 0.8 + 0.7 * compressed,
             "air_db": 0.4 + 0.4 * compressed,
             "stereo_width_delta": 0.02 * quiet,
