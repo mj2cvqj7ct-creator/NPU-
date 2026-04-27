@@ -47,6 +47,14 @@ py -m pip install -e .
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\create_desktop_shortcut.ps1
 ```
 
+## Windows ネイティブ EXE
+
+Python や PowerShell なしで起動できる Windows デスクトップアプリは、`dist/windows/NPUStreamingMusicEnhancer.exe` に生成されます。再ビルドする場合は次を実行します。
+
+```bash
+bash native/windows/build.sh
+```
+
 ## テスト
 
 ```bash

@@ -1,0 +1,6 @@
+#pragma once
+
+#define IDI_APP 101
+#define ID_START_REALTIME 1001
+#define ID_APPLY_RECOMMENDATIONS 1002
+#define ID_STOP_REALTIME 1003
