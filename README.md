@@ -101,6 +101,26 @@ Snapdragon X では、以下の順で実装候補を検討します。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
 
+## 現在のプロトタイプ
+
+このリポジトリには、OS レベル統合の前段として、WAV ファイルに対して同じ補正チェーンをオフライン適用する Python プロトタイプを含めています。
+
+- `snapdragon_audio_enhancer.audio_types`: 48 kHz stereo 相当の正規化 PCM バッファと特徴量抽出
+- `snapdragon_audio_enhancer.service_profiles`: Spotify、Apple Music、YouTube Music 向けの保守的な補正プロファイル
+- `snapdragon_audio_enhancer.inference`: ONNX Runtime QNN の接続点と CPU ヒューリスティック fallback
+- `snapdragon_audio_enhancer.dsp`: ラウドネス正規化、トーンシェイプ、トランジェント補正、ステレオ幅、soft limiter
+- `snapdragon_audio_enhancer.pipeline`: 推論結果と DSP をつなぐ音質改善パイプライン
+
+実行例:
+
+```bash
+python -m snapdragon_audio_enhancer.cli input.wav output.wav --service spotify
+python -m snapdragon_audio_enhancer.cli input.wav output.wav --service apple_music
+python -m snapdragon_audio_enhancer.cli input.wav output.wav --service youtube_music --backend qnn --enable-qnn --model model.onnx
+```
+
+`--enable-qnn` と `--model` を指定し、実行環境に ONNX Runtime QNN Execution Provider を導入した場合は Snapdragon X NPU 側の接続点を使います。未導入環境では CPU fallback が同じ `InferenceResult` 契約を返すため、DSP チェーンと評価テストを先に進められます。
+
 ## 評価指標
 
 - エンドツーエンド遅延: 40 ms 未満を目標
