@@ -1,0 +1,2 @@
+[console_scripts]
+npu-audio-enhancer = npu_audio_enhancer.__main__:main
