@@ -47,7 +47,7 @@ class AudioEnhancer:
         inferred = self.backend.process(frame)
         tuned_profile = self._profile_from_signal(inferred)
         samples = self._normalize_loudness(frame.samples, tuned_profile)
-        samples = self._apply_tone_shape(samples, tuned_profile)
+        samples = self._apply_tone_shape(samples, frame.channels, tuned_profile)
         samples = self._adjust_stereo_width(samples, tuned_profile.stereo_width)
         samples = self._limit(samples, tuned_profile.limiter_ceiling)
         return frame.with_samples(samples)
@@ -108,21 +108,24 @@ class AudioEnhancer:
     def _apply_tone_shape(
         self,
         samples: tuple[float, ...],
+        channels: int,
         profile: EnhancementProfile,
     ) -> tuple[float, ...]:
         if not samples:
             return samples
 
         shaped: list[float] = []
-        previous = samples[0]
+        previous_by_channel = list(samples[:channels])
         low_mix = _clamp(profile.bass_boost, -0.25, 0.25)
         clarity_mix = _clamp(profile.vocal_clarity, -0.20, 0.20)
 
-        for sample in samples:
+        for index, sample in enumerate(samples):
+            channel = index % channels
+            previous = previous_by_channel[channel]
             low_band = (sample + previous) * 0.5
             transient = sample - low_band
             shaped.append(_clamp(sample + low_band * low_mix + transient * clarity_mix, -1.0, 1.0))
-            previous = sample
+            previous_by_channel[channel] = sample
 
         return tuple(shaped)
 
