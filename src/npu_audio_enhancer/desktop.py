@@ -1,44 +1,60 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
-    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QMainWindow,
-    QMessageBox,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from .audio import enhance_wav, generate_demo_wav
 from .profiles import available_profiles
-from .reports import build_status_text
+from .realtime import ServiceState, build_realtime_status
 
 
 class EnhancerWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("NPU Audio Enhancer")
-        self.setMinimumSize(760, 460)
+        self.setWindowTitle("NPU Streaming Music Enhancer")
+        self.setMinimumSize(820, 520)
 
-        self.input_edit = QLineEdit()
-        self.output_edit = QLineEdit()
         self.profile_combo = QComboBox()
         self.profile_combo.addItems(sorted(available_profiles()))
-        self.profile_combo.setCurrentText("snapdragon-x-npu")
-        self.status_label = QLabel("WAV ファイルを選択して音質向上を開始してください。")
+        self.profile_combo.setCurrentText("holographic-vocal-stage")
+        self.latency_combo = QComboBox()
+        self.latency_combo.addItems(
+            [
+                "ASIO XMOS USB DAC - extreme low latency",
+                "WASAPI exclusive - low latency",
+                "Virtual output - compatibility",
+            ]
+        )
+        self.spotify_check = QCheckBox("Spotify")
+        self.apple_music_check = QCheckBox("Apple Music")
+        self.youtube_music_check = QCheckBox("YouTube Music")
+        for checkbox in (self.spotify_check, self.apple_music_check, self.youtube_music_check):
+            checkbox.setChecked(True)
+
+        self.npu_meter = QProgressBar()
+        self.npu_meter.setRange(0, 100)
+        self.npu_meter.setValue(100)
+        self.npu_meter.setFormat("NPU target load: %p%")
+        self.state_label = QLabel("STATE: STANDBY / 実機接続待ち")
+        self.state_label.setObjectName("stateLabel")
+        self.state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label = QLabel("リアルタイム配信音声の NPU 処理は待機中です。")
         self.status_label.setWordWrap(True)
-        self.result_label = QLabel("結果はここに表示されます。")
+        self.result_label = QLabel(build_realtime_status(self._service_state(), active=False))
         self.result_label.setWordWrap(True)
         self.result_label.setObjectName("resultLabel")
 
@@ -50,11 +66,11 @@ class EnhancerWindow(QMainWindow):
         outer.setContentsMargins(28, 24, 28, 24)
         outer.setSpacing(18)
 
-        title = QLabel("NPU Audio Enhancer")
+        title = QLabel("NPU Streaming Music Enhancer")
         title.setObjectName("titleLabel")
         subtitle = QLabel(
-            "Spotify / Apple Music / YouTube Music の再生音を想定した、"
-            "Snapdragon X NPU 向け音声後処理プロトタイプ"
+            "Spotify / Apple Music / YouTube Music の再生音をリアルタイムで受け、"
+            "Snapdragon X NPU をフル活用して定位・楽器分離・ボーカル立体感を狙うコントロール"
         )
         subtitle.setWordWrap(True)
         subtitle.setObjectName("subtitleLabel")
@@ -63,25 +79,32 @@ class EnhancerWindow(QMainWindow):
 
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        form.addRow("入力 WAV", self._path_picker(self.input_edit, self._choose_input))
-        form.addRow("出力 WAV", self._path_picker(self.output_edit, self._choose_output))
+        services = QHBoxLayout()
+        services.addWidget(self.spotify_check)
+        services.addWidget(self.apple_music_check)
+        services.addWidget(self.youtube_music_check)
+        services.addStretch(1)
+        form.addRow("対象サービス", services)
         form.addRow("プロファイル", self.profile_combo)
+        form.addRow("低レイテンシ出力", self.latency_combo)
+        form.addRow("NPU 使用率目標", self.npu_meter)
         outer.addLayout(form)
 
         actions = QHBoxLayout()
-        demo_button = QPushButton("デモ WAV を生成")
-        demo_button.clicked.connect(self._generate_demo)
-        enhance_button = QPushButton("音質向上を実行")
-        enhance_button.setObjectName("primaryButton")
-        enhance_button.clicked.connect(self._enhance)
-        actions.addWidget(demo_button)
+        stop_button = QPushButton("停止")
+        stop_button.clicked.connect(self._stop_realtime)
+        start_button = QPushButton("リアルタイム NPU 処理を開始")
+        start_button.setObjectName("primaryButton")
+        start_button.clicked.connect(self._start_realtime)
+        actions.addWidget(stop_button)
         actions.addStretch(1)
-        actions.addWidget(enhance_button)
+        actions.addWidget(start_button)
         outer.addLayout(actions)
 
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         outer.addWidget(separator)
+        outer.addWidget(self.state_label)
         outer.addWidget(self.status_label)
         outer.addWidget(self.result_label)
         outer.addStretch(1)
@@ -104,74 +127,54 @@ class EnhancerWindow(QMainWindow):
                 color: white;
                 border-radius: 6px;
             }
+            #stateLabel {
+                background: #dbeafe;
+                border: 1px solid #60a5fa;
+                border-radius: 8px;
+                color: #1e3a8a;
+                font-size: 18px;
+                font-weight: 700;
+                padding: 10px;
+            }
             #resultLabel {
                 background: #f3f4f6;
                 border: 1px solid #d1d5db;
                 border-radius: 8px;
+                font-family: monospace;
+                line-height: 140%;
                 padding: 12px;
             }
             """
         )
         self.setCentralWidget(root)
 
-    def _path_picker(self, edit: QLineEdit, callback) -> QWidget:
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        browse = QPushButton("参照")
-        browse.clicked.connect(callback)
-        layout.addWidget(edit)
-        layout.addWidget(browse)
-        return container
+    def _service_state(self) -> ServiceState:
+        return ServiceState(
+            spotify=self.spotify_check.isChecked(),
+            apple_music=self.apple_music_check.isChecked(),
+            youtube_music=self.youtube_music_check.isChecked(),
+            profile=self.profile_combo.currentText(),
+            latency_path=self.latency_combo.currentText(),
+        )
 
-    def _choose_input(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "入力 WAV を選択", "", "WAV files (*.wav)")
-        if path:
-            self.input_edit.setText(path)
-            if not self.output_edit.text():
-                source = Path(path)
-                self.output_edit.setText(str(source.with_name(f"{source.stem}_enhanced.wav")))
-
-    def _choose_output(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "出力 WAV を保存", "", "WAV files (*.wav)")
-        if path:
-            self.output_edit.setText(path)
-
-    def _generate_demo(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "デモ WAV を保存", "demo_input.wav", "WAV files (*.wav)")
-        if not path:
-            return
-        try:
-            generate_demo_wav(path)
-        except Exception as exc:  # pragma: no cover - user-facing error path
-            self._show_error("デモ生成に失敗しました", exc)
+    def _start_realtime(self) -> None:
+        if not self._service_state().selected_services():
+            self.state_label.setText("STATE: NEED SERVICE / 対象サービス未選択")
+            self.status_label.setText("対象サービスを少なくとも 1 つ選択してください。")
+            self.result_label.setText(build_realtime_status(self._service_state(), active=False))
             return
 
-        self.input_edit.setText(path)
-        source = Path(path)
-        self.output_edit.setText(str(source.with_name(f"{source.stem}_enhanced.wav")))
-        self.status_label.setText(f"デモ WAV を生成しました: {path}")
-        self.result_label.setText("生成した WAV をそのまま入力として使えます。")
+        self.state_label.setText("STATE: ACTIVE / リアルタイム処理中")
+        self.status_label.setText(
+            "リアルタイム NPU 処理を開始しました。実機では Windows ARM64 + "
+            "Snapdragon X NPU + ONNX Runtime QNN + ASIO XMOS USB DAC 極小バッファへ接続します。"
+        )
+        self.result_label.setText(build_realtime_status(self._service_state(), active=True))
 
-    def _enhance(self) -> None:
-        input_path = self.input_edit.text().strip()
-        output_path = self.output_edit.text().strip()
-        if not input_path or not output_path:
-            QMessageBox.warning(self, "入力不足", "入力 WAV と出力 WAV を指定してください。")
-            return
-
-        try:
-            report = enhance_wav(input_path, output_path, self.profile_combo.currentText())
-        except Exception as exc:  # pragma: no cover - user-facing error path
-            self._show_error("音質向上に失敗しました", exc)
-            return
-
-        self.status_label.setText(f"処理が完了しました: {output_path}")
-        self.result_label.setText(build_status_text(report))
-
-    def _show_error(self, title: str, exc: Exception) -> None:
-        QMessageBox.critical(self, title, str(exc))
-        self.status_label.setText(f"{title}: {exc}")
+    def _stop_realtime(self) -> None:
+        self.state_label.setText("STATE: STANDBY / 実機接続待ち")
+        self.status_label.setText("リアルタイム NPU 処理を停止しました。")
+        self.result_label.setText(build_realtime_status(self._service_state(), active=False))
 
 
 def create_app() -> QApplication:

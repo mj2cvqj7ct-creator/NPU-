@@ -7,6 +7,7 @@ from unittest import mock
 from npu_audio_enhancer.audio import AudioBuffer, enhance_audio, generate_demo_buffer, read_wav, write_wav
 from npu_audio_enhancer.profiles import get_profile
 from npu_audio_enhancer.reports import build_status_text
+from npu_audio_enhancer.realtime import ServiceState, build_realtime_status
 
 
 class AudioPipelineTest(unittest.TestCase):
@@ -26,6 +27,16 @@ class AudioPipelineTest(unittest.TestCase):
         self.assertLessEqual(peak, 0.921)
         self.assertEqual(enhanced.sample_rate, audio.sample_rate)
         self.assertEqual(enhanced.channels, audio.channels)
+
+    def test_holographic_profile_preserves_stereo_shape(self) -> None:
+        audio = generate_demo_buffer(duration_seconds=0.05)
+
+        enhanced = enhance_audio(audio, get_profile("holographic-vocal-stage"))
+
+        self.assertEqual(enhanced.channels, 2)
+        self.assertEqual(len(enhanced.samples), len(audio.samples))
+        self.assertLessEqual(max(abs(sample) for sample in enhanced.samples), 0.901)
+        self.assertNotEqual(enhanced.samples[0], enhanced.samples[1])
 
     def test_wav_round_trip(self) -> None:
         audio = generate_demo_buffer(duration_seconds=0.05)
@@ -57,6 +68,26 @@ class AudioPipelineTest(unittest.TestCase):
         self.assertIn("Target backend: onnxruntime-qnn", status)
         self.assertIn("Samples: 96000", status)
         self.assertIn("Output peak: 0.7630", status)
+
+    def test_realtime_status_mentions_npu_streaming_requirements(self) -> None:
+        status = build_realtime_status(
+            ServiceState(
+                spotify=True,
+                apple_music=True,
+                youtube_music=True,
+                profile="snapdragon-x-npu",
+            ),
+            active=True,
+        )
+
+        self.assertIn("Spotify, Apple Music, YouTube Music", status)
+        self.assertIn("snapdragon-x-npu", status)
+        self.assertIn("Windows ARM64 + Snapdragon X NPU", status)
+        self.assertIn("ONNX Runtime QNN Execution Provider", status)
+        self.assertIn("ASIO exclusive output", status)
+        self.assertIn("holographic imaging", status)
+        self.assertIn("XMOS USB DAC Driver Control Panel", status)
+        self.assertIn("target 32 samples", status)
 
 
 if __name__ == "__main__":

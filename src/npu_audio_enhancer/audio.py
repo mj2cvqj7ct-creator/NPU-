@@ -89,6 +89,7 @@ def enhance_audio(buffer: AudioBuffer, profile: EnhancementProfile) -> AudioBuff
         for sample in buffer.samples
     ]
     processed = [_compress_sample(sample, profile) for sample in normalized]
+    processed = _apply_stereo_image(processed, buffer.channels, profile)
     clipped = [
         math.tanh(sample * profile.soft_clip_drive) / math.tanh(profile.soft_clip_drive)
         for sample in processed
@@ -129,3 +130,21 @@ def _compress_sample(sample: float, profile: EnhancementProfile) -> float:
     excess = magnitude - profile.compressor_threshold
     compressed = profile.compressor_threshold + (excess / profile.compressor_ratio)
     return sign * compressed * profile.makeup_gain
+
+
+def _apply_stereo_image(samples: list[float], channels: int, profile: EnhancementProfile) -> list[float]:
+    if channels != 2:
+        return samples
+
+    enhanced: list[float] = []
+    width = profile.stereo_width
+    center = profile.center_focus
+    air = profile.air_lift
+    for index in range(0, len(samples), 2):
+        left = samples[index]
+        right = samples[index + 1]
+        mid = (left + right) * 0.5 * center
+        side = (left - right) * 0.5 * width
+        shimmer = side * air
+        enhanced.extend([mid + side + shimmer, mid - side - shimmer])
+    return enhanced
