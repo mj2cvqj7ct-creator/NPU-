@@ -101,6 +101,11 @@ Snapdragon X では、以下の順で実装候補を検討します。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
 
+## 詳細設計
+
+- [Snapdragon X NPU 実行設計](docs/snapdragon-x-npu-execution.md)
+- [音質改善アルゴリズム設計](docs/audio-quality-algorithm.md)
+
 ## 評価指標
 
 - エンドツーエンド遅延: 40 ms 未満を目標
