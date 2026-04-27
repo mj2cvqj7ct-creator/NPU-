@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Service-agnostic audio enhancement pipeline for Snapdragon X NPU PCs."
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [project.scripts]
 snapdragon-npu-audio = "snapdragon_npu_audio.cli:main"
 
