@@ -4,6 +4,5 @@ version = "0.1.0"
 description = "Reference DSP and NPU orchestration for Snapdragon X audio enhancement."
 requires-python = ">=3.10"
 
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
+[tool.setuptools.packages.find]
+where = ["src"]

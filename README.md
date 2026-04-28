@@ -116,10 +116,23 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - Spotify、Apple Music、YouTube Music の推薦ランキングやアプリ内部ロジックの改変
 - すべての音源を無条件に派手に加工すること
 
+## 追加済みの参照実装
+
+- `src/snapdragon_audio_enhancer/dsp.py`: フレーム計測、ラウドネス補正、トーン整形、ステレオ幅補正、true peak limiter
+- `src/snapdragon_audio_enhancer/npu.py`: QNN / ONNX Runtime QNN に差し替えるための NPU 推論境界と CPU 参照モデル
+- `src/snapdragon_audio_enhancer/pipeline.py`: 10 ms から 20 ms 程度の stereo PCM フレームを処理する低遅延パイプライン
+- `src/snapdragon_audio_enhancer/profiles.py`: Spotify、Apple Music、YouTube Music、generic のローカル補正プロファイル
+- `tests/`: limiter、空フレーム、サービス別プロファイル、特徴量抽出の自動テスト
+
+テストは外部依存なしで実行できます。
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+```
+
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
-- `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- `src/inference/`: ONNX Runtime QNN / Qualcomm QNN backend integration
+- `src/profile/`: ローカル個人化プロファイルの暗号化保存
+- WAV 入出力による DSP 回帰テストと AB テスト用メトリクス収集
