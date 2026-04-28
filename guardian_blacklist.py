@@ -399,28 +399,51 @@ def evidence_digest(entries: Iterable[BlacklistEntry]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def report_contacts(audience: str) -> list[str]:
+    if audience == "international":
+        return [
+            "- Your national CERT/CSIRT official reporting channel",
+            "- The affected network owner's official abuse or security desk",
+            "- International anti-phishing or malware reporting portals, when relevant",
+            "- Local law enforcement first, if personal safety or financial loss is involved",
+        ]
+    if audience == "public":
+        return [
+            "- Local police cybercrime consultation desk",
+            "- National or regional cyber incident consultation desk",
+            "- Your internet provider abuse or security desk",
+            "- Your bank's official fraud desk, if account access or payments may be affected",
+        ]
+    return [
+        "- Your internet provider abuse or security desk",
+        "- Local police cybercrime consultation desk",
+        "- Your bank's official fraud desk, if account access or payments may be affected",
+    ]
+
+
 def report(args: argparse.Namespace) -> int:
     entries = BlacklistStore(args.data_dir).load()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     generated_at = utc_now()
     digest = evidence_digest(entries)
+    audience = getattr(args, "audience", "general")
     lines = [
         "# Guardian Blacklist Incident Report",
         "",
         f"- Generated at: {generated_at}",
         f"- Entries: {len(entries)}",
         f"- Evidence digest: `{digest}`",
+        f"- Intended audience: {audience}",
         "",
         "## Important legal note",
         "",
         "This report is for manual review and submission to legitimate contacts.",
-        "The tool does not automatically register anyone with providers, police, banks, or public blacklists.",
+        "The tool does not automatically register, submit, message, or accuse anyone with providers, public agencies, international organizations, or public blacklists.",
+        "Verify the evidence and use only official reporting channels before submitting anything.",
         "",
         "## Suggested manual contacts",
         "",
-        "- Your internet provider abuse or security desk",
-        "- Local police cybercrime consultation desk",
-        "- Your bank's official fraud desk, if account access or payments may be affected",
+        *report_contacts(audience),
         "",
         "## Entries",
         "",
@@ -509,6 +532,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     report_cmd = subparsers.add_parser("report", help="write a manual report")
     report_cmd.add_argument("output", type=Path)
+    report_cmd.add_argument(
+        "--audience",
+        choices=["general", "public", "international"],
+        default="general",
+        help="tailor manual contact suggestions without submitting anything",
+    )
     report_cmd.set_defaults(func=report)
     return parser
 

@@ -34,11 +34,18 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertFalse(store.add(store.load()[0]))
 
             report_path = data_dir / "report.md"
-            args = argparse.Namespace(data_dir=data_dir, output=report_path)
+            args = argparse.Namespace(
+                data_dir=data_dir,
+                output=report_path,
+                audience="international",
+            )
             self.assertEqual(gb.report(args), 0)
             report_text = report_path.read_text(encoding="utf-8")
             self.assertIn("8.8.8.8", report_text)
-            self.assertIn("does not automatically register anyone", report_text)
+            self.assertIn("Intended audience: international", report_text)
+            self.assertIn("national CERT/CSIRT", report_text)
+            self.assertIn("does not automatically register", report_text)
+            self.assertIn("international organizations", report_text)
 
     def test_scan_log_respects_threshold_for_ipv4_and_ipv6(self):
         with tempfile.TemporaryDirectory() as temp_dir:
