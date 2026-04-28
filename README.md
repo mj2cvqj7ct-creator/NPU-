@@ -52,6 +52,12 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Linux 検証環境で `c++` が `-lstdc++` を解決できない場合は、GCC を明示します。
+
+```bash
+CXX=g++ cmake -S . -B build
+```
+
 WAV ファイルで補正を試す例:
 
 ```bash
