@@ -81,6 +81,7 @@ def build_inference_plan_text(profile_name: str, services: tuple[str, ...]) -> s
     return "\n\n".join(
         (
             "Snapdragon X NPU inference plan",
+            "Runtime: Windows ARM64 + Snapdragon X NPU + ONNX Runtime QNN Execution Provider",
             plan.summary(),
             *service_lines,
             "Fallback order: QNN NPU -> DirectML -> CPU reference DSP",
@@ -94,11 +95,11 @@ def build_control_vector(
 ) -> NeuralControlVector:
     tuning = get_service_tuning(service)
     return NeuralControlVector(
-        detail=_clamp(profile.neural_detail * tuning.detail_bias, 0.0, 0.35),
+        detail=_clamp(profile.neural_detail * tuning.air_bias * tuning.transient_bias, 0.0, 0.35),
         deartifact=_clamp(profile.deartifact * tuning.deartifact_bias, 0.0, 0.35),
         vocal_lift=_clamp((profile.vocal_presence - 1.0) * tuning.vocal_bias, 0.0, 0.35),
         bass_control=_clamp((profile.bass_tightness - 1.0) * tuning.bass_bias, 0.0, 0.35),
-        spatial=_clamp((profile.stereo_width - 1.0) * tuning.spatial_bias, 0.0, 0.45),
+        spatial=_clamp((profile.stereo_width - 1.0) * tuning.stereo_bias, 0.0, 0.45),
         loudness_guard=_clamp(profile.loudness_guard + tuning.loudness_bias, 0.0, 0.35),
     )
 
@@ -109,7 +110,7 @@ def service_tuning_report(service: str, profile: EnhancementProfile) -> str:
     plan = build_inference_plan(profile)
     return "\n".join(
         [
-            f"Service: {tuning.display_name}",
+            f"Service: {_display_service_name(tuning.name)}",
             f"Profile: {profile.name}",
             f"NPU plan: {plan.summary()}",
             "Control vector: "
@@ -122,3 +123,12 @@ def service_tuning_report(service: str, profile: EnhancementProfile) -> str:
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
+
+
+def _display_service_name(name: str) -> str:
+    return {
+        "generic": "Generic PCM source",
+        "spotify": "Spotify",
+        "apple-music": "Apple Music",
+        "youtube-music": "YouTube Music",
+    }.get(name, name)

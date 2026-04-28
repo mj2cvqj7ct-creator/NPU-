@@ -49,7 +49,7 @@ class EnhancementReport:
     output_peak: float
     input_rms: float
     output_rms: float
-    service: str
+    services: tuple[str, ...]
 
 
 def read_wav(path: str | Path) -> AudioBuffer:
@@ -170,7 +170,7 @@ def enhance_wav(
         output_peak=peak(enhanced.samples),
         input_rms=rms(source.samples),
         output_rms=rms(enhanced.samples),
-        service=", ".join(_service_display_names(services)),
+        services=_service_display_names(services),
     )
 
 
