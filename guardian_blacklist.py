@@ -277,6 +277,17 @@ def watch_log(args: argparse.Namespace) -> int:
             )
             for entry in added_entries:
                 print(f"added {entry.ip}: {entry.evidence}", flush=True)
+            if added_entries and getattr(args, "abuseipdb_export", None):
+                write_abuseipdb_report(
+                    args.data_dir,
+                    args.abuseipdb_export,
+                    args.abuseipdb_export_format,
+                    args.abuseipdb_categories,
+                )
+                print(
+                    f"updated AbuseIPDB manual report at {args.abuseipdb_export}",
+                    flush=True,
+                )
             if args.apply and added_entries:
                 apply_firewall_for_entries(added_entries, args.system)
         else:
@@ -312,6 +323,17 @@ def build_watch_command(args: argparse.Namespace) -> list[str]:
         "--reason",
         args.reason,
     ]
+    if getattr(args, "abuseipdb_export", None):
+        command.extend(
+            [
+                "--abuseipdb-export",
+                str(args.abuseipdb_export),
+                "--abuseipdb-export-format",
+                args.abuseipdb_export_format,
+                "--abuseipdb-categories",
+                args.abuseipdb_categories,
+            ]
+        )
     if args.apply:
         command.append("--apply")
     return command
@@ -417,6 +439,23 @@ def add_watcher_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--reason", default="Repeated suspicious log activity")
     parser.add_argument("--interval", type=int, default=DEFAULT_SCAN_INTERVAL_SECONDS)
+    parser.add_argument(
+        "--abuseipdb-export",
+        type=Path,
+        default=None,
+        help="update an AbuseIPDB manual submission file when new entries are detected",
+    )
+    parser.add_argument(
+        "--abuseipdb-export-format",
+        choices=["json", "csv"],
+        default="json",
+        help="format for --abuseipdb-export",
+    )
+    parser.add_argument(
+        "--abuseipdb-categories",
+        default=DEFAULT_ABUSEIPDB_CATEGORIES,
+        help="comma-separated AbuseIPDB category IDs to suggest after review",
+    )
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -527,14 +566,18 @@ def abuseipdb_comment(entry: BlacklistEntry) -> str:
     )
 
 
-def abuseipdb_report(args: argparse.Namespace) -> int:
-    entries = BlacklistStore(args.data_dir).load()
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+def write_abuseipdb_report(
+    data_dir: Path,
+    output: Path,
+    output_format: str,
+    categories: str,
+) -> None:
+    entries = BlacklistStore(data_dir).load()
+    output.parent.mkdir(parents=True, exist_ok=True)
     generated_at = utc_now()
-    categories = args.categories
 
-    if args.format == "csv":
-        with args.output.open("w", encoding="utf-8", newline="") as file:
+    if output_format == "csv":
+        with output.open("w", encoding="utf-8", newline="") as file:
             writer = csv.DictWriter(
                 file,
                 fieldnames=["ip", "categories", "comment", "timestamp"],
@@ -568,11 +611,14 @@ def abuseipdb_report(args: argparse.Namespace) -> int:
                 for entry in entries
             ],
         }
-        args.output.write_text(
+        output.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
 
+
+def abuseipdb_report(args: argparse.Namespace) -> int:
+    write_abuseipdb_report(args.data_dir, args.output, args.format, args.categories)
     print(f"wrote AbuseIPDB manual report to {args.output}")
     print("manual submission only: no AbuseIPDB API call was made")
     return 0

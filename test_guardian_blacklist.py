@@ -132,6 +132,34 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertIn("Manual review required", report_text)
             self.assertIn("9.9.9.9", report_text)
 
+    def test_watch_log_updates_abuseipdb_manual_export_when_new_entries_arrive(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            log_path = data_dir / "firewall.log"
+            export_path = data_dir / "abuseipdb.json"
+            log_path.write_text("deny 9.9.9.9\ndeny 9.9.9.9\n", encoding="utf-8")
+            args = argparse.Namespace(
+                data_dir=data_dir,
+                log_file=log_path,
+                threshold=2,
+                reason="Repeated suspicious log activity",
+                apply=False,
+                system=None,
+                once=True,
+                interval=1,
+                port_scan_threshold=10,
+                abuseipdb_export=export_path,
+                abuseipdb_export_format="json",
+                abuseipdb_categories="14,15",
+            )
+
+            self.assertEqual(gb.watch_log(args), 0)
+
+            report_text = export_path.read_text(encoding="utf-8")
+            self.assertIn('"manual_submission_only": true', report_text)
+            self.assertIn('"does_not_submit_to_abuseipdb": true', report_text)
+            self.assertIn("9.9.9.9", report_text)
+
     def test_watch_log_once_scans_without_looping(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
@@ -147,6 +175,9 @@ class GuardianBlacklistTest(unittest.TestCase):
                 once=True,
                 interval=1,
                 port_scan_threshold=10,
+                abuseipdb_export=None,
+                abuseipdb_export_format="json",
+                abuseipdb_categories="14,15",
             )
 
             self.assertEqual(gb.watch_log(args), 0)
@@ -166,6 +197,9 @@ class GuardianBlacklistTest(unittest.TestCase):
                 reason="Repeated suspicious log activity",
                 interval=15,
                 port_scan_threshold=10,
+                abuseipdb_export=None,
+                abuseipdb_export_format="json",
+                abuseipdb_categories="14,15",
                 apply=False,
                 enable=False,
                 service_dir=service_dir,
@@ -196,6 +230,9 @@ class GuardianBlacklistTest(unittest.TestCase):
                 reason="Repeated suspicious log activity",
                 interval=1,
                 port_scan_threshold=4,
+                abuseipdb_export=Path(temp_dir) / "abuseipdb.json",
+                abuseipdb_export_format="json",
+                abuseipdb_categories="14,15",
                 apply=True,
                 enable=False,
                 service_dir=service_dir,
@@ -210,6 +247,7 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertIn("WantedBy=multi-user.target", service_text)
             self.assertIn("--interval 1", service_text)
             self.assertIn("--port-scan-threshold 4", service_text)
+            self.assertIn("--abuseipdb-export", service_text)
             self.assertIn("--apply", service_text)
             self.assertNotIn("police", service_text.lower())
             self.assertNotIn("bank", service_text.lower())

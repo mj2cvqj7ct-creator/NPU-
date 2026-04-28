@@ -24,14 +24,15 @@ python3 guardian_blacklist.py report ./incident_report.md
 python3 guardian_blacklist.py report ./international_report.md --audience international
 python3 guardian_blacklist.py report ./japan_international_report.md --audience japan-international
 python3 guardian_blacklist.py abuseipdb-report ./abuseipdb_manual.json
+python3 guardian_blacklist.py watch-log ./security.log --abuseipdb-export ./abuseipdb_manual.json
 ```
 
 ## Cursorなしで起動時に自動開始する
 
-Linuxでは、OS起動時に常駐監視を開始するsystemd system serviceを生成できます。`--apply` を付けると、新しく見つかった公開IPv4/IPv6をローカルファイアウォールへ適用します。ポートスキャン兆候は、同じIPから観測された異なる宛先ポート数が `--port-scan-threshold` 以上になった場合に記録します。
+Linuxでは、OS起動時に常駐監視を開始するsystemd system serviceを生成できます。`--apply` を付けると、新しく見つかった公開IPv4/IPv6をローカルファイアウォールへ適用します。ポートスキャン兆候は、同じIPから観測された異なる宛先ポート数が `--port-scan-threshold` 以上になった場合に記録します。`--abuseipdb-export` を付けると、検知のたびにAbuseIPDB手動提出用ファイルをローカル更新します。
 
 ```bash
-sudo python3 guardian_blacklist.py install-boot-service /var/log/security.log --threshold 5 --port-scan-threshold 10 --apply --enable
+sudo python3 guardian_blacklist.py install-boot-service /var/log/security.log --threshold 5 --port-scan-threshold 10 --abuseipdb-export /var/lib/guardian-blacklist/abuseipdb_manual.json --apply --enable
 ```
 
 ログイン時だけ常駐させたい場合は、systemd user serviceも生成できます。
@@ -52,5 +53,5 @@ python3 guardian_blacklist.py install-autostart ./security.log --threshold 5 --e
 - プライベート、ループバック、予約済み、マルチキャストIPは拒否します。
 - 外部機関への送信や登録は行いません。
 - レポートは手動確認・手動提出用です。
-- AbuseIPDB向けファイルも手動提出用で、API送信は行いません。
+- AbuseIPDB向けファイルは検知時に自動更新できますが、手動提出用でAPI送信は行いません。
 - 常駐監視はローカルログの解析、ポートスキャン/IPスキャン兆候の検知、ローカルブラックリスト登録だけを行います。
