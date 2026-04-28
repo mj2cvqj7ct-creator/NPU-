@@ -26,7 +26,8 @@ from typing import Iterable
 
 
 APP_NAME = "guardian-blacklist"
-IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+IPV6_RE = re.compile(r"(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f:.%]+")
 DEFAULT_SCAN_INTERVAL_SECONDS = 30
 
 
@@ -54,8 +55,6 @@ def validate_blockable_ip(value: str) -> str:
         ip = ipaddress.ip_address(value)
     except ValueError as exc:
         raise argparse.ArgumentTypeError(f"invalid IP address: {value}") from exc
-    if ip.version != 4:
-        raise argparse.ArgumentTypeError("only IPv4 addresses are supported")
     if not ip.is_global:
         raise argparse.ArgumentTypeError(
             "refusing to blacklist private, loopback, reserved, or multicast IPs"
@@ -93,6 +92,7 @@ class BlacklistStore:
 
 def firewall_commands(ip: str, system: str | None = None) -> list[list[str]]:
     os_name = (system or platform.system()).lower()
+    address = ipaddress.ip_address(ip)
     if os_name == "windows":
         return [
             [
@@ -120,8 +120,9 @@ def firewall_commands(ip: str, system: str | None = None) -> list[list[str]]:
         ]
     if os_name == "darwin":
         return [["sudo", "pfctl", "-t", APP_NAME, "-T", "add", ip]]
+    set_name = APP_NAME if address.version == 4 else f"{APP_NAME}-ipv6"
     return [
-        ["sudo", "nft", "add", "element", "inet", "filter", APP_NAME, f"{{ {ip} }}"]
+        ["sudo", "nft", "add", "element", "inet", "filter", set_name, f"{{ {ip} }}"]
     ]
 
 
@@ -133,6 +134,16 @@ def shell_join(command: list[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
+def iter_ip_candidates(text: str) -> Iterable[str]:
+    for match in IPV4_RE.finditer(text):
+        yield match.group(0)
+    for match in IPV6_RE.finditer(text):
+        candidate = match.group(0).strip("[](),;")
+        if "%" in candidate:
+            candidate = candidate.split("%", 1)[0]
+        yield candidate
+
+
 def scan_log_file(
     data_dir: Path,
     log_file: Path,
@@ -142,7 +153,7 @@ def scan_log_file(
     store = BlacklistStore(data_dir)
     text = log_file.read_text(encoding="utf-8", errors="replace")
     counts: dict[str, int] = {}
-    for candidate in IP_RE.findall(text):
+    for candidate in iter_ip_candidates(text):
         try:
             ip = validate_blockable_ip(candidate)
         except argparse.ArgumentTypeError:
@@ -368,7 +379,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    add = subparsers.add_parser("add", help="add one public IPv4 address")
+    add = subparsers.add_parser("add", help="add one public IPv4 or IPv6 address")
     add.add_argument("ip", type=validate_blockable_ip)
     add.add_argument("--reason", required=True)
     add.add_argument("--source", required=True)

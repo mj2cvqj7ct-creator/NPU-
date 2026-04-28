@@ -10,6 +10,12 @@ class GuardianBlacklistTest(unittest.TestCase):
     def test_rejects_private_addresses(self):
         with self.assertRaises(argparse.ArgumentTypeError):
             gb.validate_blockable_ip("192.168.1.10")
+        with self.assertRaises(argparse.ArgumentTypeError):
+            gb.validate_blockable_ip("fd00::1")
+
+    def test_accepts_global_ipv4_and_ipv6_addresses(self):
+        self.assertEqual(gb.validate_blockable_ip("8.8.8.8"), "8.8.8.8")
+        self.assertEqual(gb.validate_blockable_ip("2001:4860:4860::8888"), "2001:4860:4860::8888")
 
     def test_add_list_and_report(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -34,12 +40,17 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertIn("8.8.8.8", report_text)
             self.assertIn("does not automatically register anyone", report_text)
 
-    def test_scan_log_respects_threshold(self):
+    def test_scan_log_respects_threshold_for_ipv4_and_ipv6(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
             log_path = data_dir / "firewall.log"
             log_path.write_text(
-                "denied 1.1.1.1\nallowed 8.8.8.8\ndenied 1.1.1.1\n",
+                "denied 1.1.1.1\n"
+                "allowed 8.8.8.8\n"
+                "denied 1.1.1.1\n"
+                "denied [2001:4860:4860::8888]\n"
+                "denied 2001:4860:4860::8888\n"
+                "ignored fd00::1\n",
                 encoding="utf-8",
             )
             args = argparse.Namespace(
@@ -50,7 +61,10 @@ class GuardianBlacklistTest(unittest.TestCase):
             )
             self.assertEqual(gb.scan_log(args), 0)
             entries = gb.BlacklistStore(data_dir).load()
-            self.assertEqual([entry.ip for entry in entries], ["1.1.1.1"])
+            self.assertEqual(
+                [entry.ip for entry in entries],
+                ["1.1.1.1", "2001:4860:4860::8888"],
+            )
 
     def test_watch_log_once_scans_without_looping(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -108,6 +122,12 @@ class GuardianBlacklistTest(unittest.TestCase):
         self.assertIn("netsh advfirewall firewall add rule", rendered)
         self.assertNotIn("police", rendered.lower())
         self.assertNotIn("bank", rendered.lower())
+
+    def test_linux_firewall_commands_use_ipv6_set_for_ipv6(self):
+        commands = gb.firewall_commands("2001:4860:4860::8888", "Linux")
+        rendered = "\n".join(gb.format_command(command) for command in commands)
+        self.assertIn("guardian-blacklist-ipv6", rendered)
+        self.assertIn("2001:4860:4860::8888", rendered)
 
 
 if __name__ == "__main__":
