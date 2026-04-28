@@ -28,7 +28,12 @@ from typing import Iterable
 APP_NAME = "guardian-blacklist"
 IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 IPV6_RE = re.compile(r"(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f:.%]+")
+PORT_RE = re.compile(
+    r"\b(?:dpt|dst_port|destination_port|port)\s*[=: ]\s*(\d{1,5})\b",
+    re.IGNORECASE,
+)
 DEFAULT_SCAN_INTERVAL_SECONDS = 1
+DEFAULT_PORT_SCAN_THRESHOLD = 10
 
 
 @dataclass(frozen=True)
@@ -144,32 +149,55 @@ def iter_ip_candidates(text: str) -> Iterable[str]:
         yield candidate
 
 
+def iter_ports(text: str) -> Iterable[int]:
+    for match in PORT_RE.finditer(text):
+        port = int(match.group(1))
+        if 1 <= port <= 65535:
+            yield port
+
+
 def scan_log_file(
     data_dir: Path,
     log_file: Path,
     threshold: int,
     reason: str,
+    port_threshold: int = DEFAULT_PORT_SCAN_THRESHOLD,
 ) -> list[BlacklistEntry]:
     store = BlacklistStore(data_dir)
     text = log_file.read_text(encoding="utf-8", errors="replace")
     counts: dict[str, int] = {}
-    for candidate in iter_ip_candidates(text):
-        try:
-            ip = validate_blockable_ip(candidate)
-        except argparse.ArgumentTypeError:
-            continue
-        counts[ip] = counts.get(ip, 0) + 1
+    ports_by_ip: dict[str, set[int]] = {}
+    for line in text.splitlines():
+        ports = set(iter_ports(line))
+        for candidate in iter_ip_candidates(line):
+            try:
+                ip = validate_blockable_ip(candidate)
+            except argparse.ArgumentTypeError:
+                continue
+            counts[ip] = counts.get(ip, 0) + 1
+            if ports:
+                ports_by_ip.setdefault(ip, set()).update(ports)
 
     added_entries: list[BlacklistEntry] = []
     for ip, count in sorted(counts.items()):
-        if count < threshold:
+        distinct_ports = ports_by_ip.get(ip, set())
+        if count < threshold and len(distinct_ports) < port_threshold:
             continue
-        evidence = f"{log_file} mentions this IP {count} times"
+        evidence_parts = []
+        if count >= threshold:
+            evidence_parts.append(
+                f"possible IP scan/repeated activity: {log_file} mentions this IP {count} times"
+            )
+        if len(distinct_ports) >= port_threshold:
+            evidence_parts.append(
+                "possible port scan: "
+                f"{len(distinct_ports)} distinct destination ports observed"
+            )
         entry = BlacklistEntry(
             ip=ip,
             reason=reason,
             source=str(log_file),
-            evidence=evidence,
+            evidence="; ".join(evidence_parts),
             created_at=utc_now(),
         )
         if store.add(entry):
@@ -212,7 +240,13 @@ def list_entries(args: argparse.Namespace) -> int:
 
 
 def scan_log(args: argparse.Namespace) -> int:
-    added_entries = scan_log_file(args.data_dir, args.log_file, args.threshold, args.reason)
+    added_entries = scan_log_file(
+        args.data_dir,
+        args.log_file,
+        args.threshold,
+        args.reason,
+        args.port_scan_threshold,
+    )
     for entry in added_entries:
         print(f"added {entry.ip}: {entry.evidence}")
     print(f"scan complete: {len(added_entries)} new entries")
@@ -237,6 +271,7 @@ def watch_log(args: argparse.Namespace) -> int:
                 args.log_file,
                 args.threshold,
                 args.reason,
+                args.port_scan_threshold,
             )
             for entry in added_entries:
                 print(f"added {entry.ip}: {entry.evidence}", flush=True)
@@ -270,6 +305,8 @@ def build_watch_command(args: argparse.Namespace) -> list[str]:
         str(args.threshold),
         "--interval",
         str(args.interval),
+        "--port-scan-threshold",
+        str(args.port_scan_threshold),
         "--reason",
         args.reason,
     ]
@@ -370,6 +407,12 @@ def install_boot_service(args: argparse.Namespace) -> int:
 def add_watcher_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("log_file", type=Path)
     parser.add_argument("--threshold", type=int, default=5)
+    parser.add_argument(
+        "--port-scan-threshold",
+        type=int,
+        default=DEFAULT_PORT_SCAN_THRESHOLD,
+        help="distinct destination ports from one IP that indicate a port scan",
+    )
     parser.add_argument("--reason", default="Repeated suspicious log activity")
     parser.add_argument("--interval", type=int, default=DEFAULT_SCAN_INTERVAL_SECONDS)
     parser.add_argument(
@@ -507,6 +550,12 @@ def build_parser() -> argparse.ArgumentParser:
     scan = subparsers.add_parser("scan-log", help="add public IPs seen repeatedly")
     scan.add_argument("log_file", type=Path)
     scan.add_argument("--threshold", type=int, default=5)
+    scan.add_argument(
+        "--port-scan-threshold",
+        type=int,
+        default=DEFAULT_PORT_SCAN_THRESHOLD,
+        help="distinct destination ports from one IP that indicate a port scan",
+    )
     scan.add_argument("--reason", default="Repeated suspicious log activity")
     scan.set_defaults(func=scan_log)
 

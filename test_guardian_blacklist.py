@@ -37,12 +37,12 @@ class GuardianBlacklistTest(unittest.TestCase):
             args = argparse.Namespace(
                 data_dir=data_dir,
                 output=report_path,
-                audience="international",
+                audience="japan-international",
             )
             self.assertEqual(gb.report(args), 0)
             report_text = report_path.read_text(encoding="utf-8")
             self.assertIn("8.8.8.8", report_text)
-            self.assertIn("Intended audience: international", report_text)
+            self.assertIn("Intended audience: japan-international", report_text)
             self.assertIn("JPCERT/CC", report_text)
             self.assertIn("national CERT/CSIRT", report_text)
             self.assertIn("does not automatically register", report_text)
@@ -65,6 +65,7 @@ class GuardianBlacklistTest(unittest.TestCase):
                 data_dir=data_dir,
                 log_file=log_path,
                 threshold=2,
+                port_scan_threshold=10,
                 reason="Repeated suspicious log activity",
             )
             self.assertEqual(gb.scan_log(args), 0)
@@ -73,6 +74,32 @@ class GuardianBlacklistTest(unittest.TestCase):
                 [entry.ip for entry in entries],
                 ["1.1.1.1", "2001:4860:4860::8888"],
             )
+
+    def test_scan_log_detects_port_scan_by_distinct_ports(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            log_path = data_dir / "firewall.log"
+            log_path.write_text(
+                "\n".join(
+                    f"denied src=9.9.9.9 dpt={port}"
+                    for port in [22, 23, 25, 53, 80]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                data_dir=data_dir,
+                log_file=log_path,
+                threshold=99,
+                port_scan_threshold=5,
+                reason="Port scan or IP scan detected",
+            )
+
+            self.assertEqual(gb.scan_log(args), 0)
+
+            entries = gb.BlacklistStore(data_dir).load()
+            self.assertEqual([entry.ip for entry in entries], ["9.9.9.9"])
+            self.assertIn("possible port scan", entries[0].evidence)
 
     def test_watch_log_once_scans_without_looping(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -88,6 +115,7 @@ class GuardianBlacklistTest(unittest.TestCase):
                 system=None,
                 once=True,
                 interval=1,
+                port_scan_threshold=10,
             )
 
             self.assertEqual(gb.watch_log(args), 0)
@@ -106,6 +134,7 @@ class GuardianBlacklistTest(unittest.TestCase):
                 threshold=3,
                 reason="Repeated suspicious log activity",
                 interval=15,
+                port_scan_threshold=10,
                 apply=False,
                 enable=False,
                 service_dir=service_dir,
@@ -135,6 +164,7 @@ class GuardianBlacklistTest(unittest.TestCase):
                 threshold=2,
                 reason="Repeated suspicious log activity",
                 interval=1,
+                port_scan_threshold=4,
                 apply=True,
                 enable=False,
                 service_dir=service_dir,
@@ -148,6 +178,7 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertIn("After=network-online.target", service_text)
             self.assertIn("WantedBy=multi-user.target", service_text)
             self.assertIn("--interval 1", service_text)
+            self.assertIn("--port-scan-threshold 4", service_text)
             self.assertIn("--apply", service_text)
             self.assertNotIn("police", service_text.lower())
             self.assertNotIn("bank", service_text.lower())

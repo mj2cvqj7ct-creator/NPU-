@@ -19,6 +19,7 @@ python3 guardian_blacklist.py add 8.8.8.8 \
 python3 guardian_blacklist.py list
 python3 guardian_blacklist.py scan-log ./security.log --threshold 5
 python3 guardian_blacklist.py watch-log ./security.log --threshold 5
+python3 guardian_blacklist.py scan-log ./security.log --port-scan-threshold 10
 python3 guardian_blacklist.py report ./incident_report.md
 python3 guardian_blacklist.py report ./international_report.md --audience international
 python3 guardian_blacklist.py report ./japan_international_report.md --audience japan-international
@@ -26,10 +27,10 @@ python3 guardian_blacklist.py report ./japan_international_report.md --audience 
 
 ## Cursorなしで起動時に自動開始する
 
-Linuxでは、OS起動時に常駐監視を開始するsystemd system serviceを生成できます。`--apply` を付けると、新しく見つかった公開IPv4/IPv6をローカルファイアウォールへ適用します。
+Linuxでは、OS起動時に常駐監視を開始するsystemd system serviceを生成できます。`--apply` を付けると、新しく見つかった公開IPv4/IPv6をローカルファイアウォールへ適用します。ポートスキャン兆候は、同じIPから観測された異なる宛先ポート数が `--port-scan-threshold` 以上になった場合に記録します。
 
 ```bash
-sudo python3 guardian_blacklist.py install-boot-service /var/log/security.log --threshold 5 --apply --enable
+sudo python3 guardian_blacklist.py install-boot-service /var/log/security.log --threshold 5 --port-scan-threshold 10 --apply --enable
 ```
 
 ログイン時だけ常駐させたい場合は、systemd user serviceも生成できます。
@@ -50,4 +51,4 @@ python3 guardian_blacklist.py install-autostart ./security.log --threshold 5 --e
 - プライベート、ループバック、予約済み、マルチキャストIPは拒否します。
 - 外部機関への送信や登録は行いません。
 - レポートは手動確認・手動提出用です。
-- 常駐監視はローカルログの解析とローカルブラックリスト登録だけを行います。
+- 常駐監視はローカルログの解析、ポートスキャン/IPスキャン兆候の検知、ローカルブラックリスト登録だけを行います。
