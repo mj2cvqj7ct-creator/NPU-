@@ -46,6 +46,14 @@ bash scripts/linux/install_cursor_desktop_launcher.sh
 ```
 
 作成後、デスクトップまたはアプリ一覧の `NPU Streaming Music Enhancer` から起動できます。
+同じコマンドで `~/.config/autostart/npu-audio-enhancer.desktop` も作成されるため、Cursor を起動しなくても Linux デスクトップへのログイン直後に自動起動します。
+アプリは `~/.config/npu-audio-enhancer/settings.json` に前回のサービス選択、プロファイル、低レイテンシ出力、ACTIVE/STANDBY 状態を保存し、前回 ACTIVE なら次回起動時に自動で有効化します。
+
+自動起動を無効にする場合は次を実行します。
+
+```bash
+bash scripts/linux/install_cursor_desktop_launcher.sh --no-autostart
+```
 
 ## 実行例
 

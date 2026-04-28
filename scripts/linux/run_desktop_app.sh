@@ -12,4 +12,6 @@ then
 fi
 
 export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
-exec python3 -m npu_audio_enhancer.desktop
+mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/npu-audio-enhancer"
+exec python3 -m npu_audio_enhancer.desktop "$@" \
+  >> "${XDG_STATE_HOME:-$HOME/.local/state}/npu-audio-enhancer/desktop.log" 2>&1

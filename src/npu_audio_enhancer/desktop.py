@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import sys
 
 from PySide6.QtCore import Qt
@@ -22,17 +23,21 @@ from PySide6.QtWidgets import (
 from .profiles import available_profiles
 from .recommender import build_recommendation_status, generate_recommendations
 from .realtime import LowLatencyBufferPlan, ServiceState, build_realtime_status
+from .settings import AppSettings, load_settings, save_settings
 
 
 class EnhancerWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, *, start_minimized: bool = False) -> None:
         super().__init__()
+        self.settings = load_settings()
+        self.start_minimized = start_minimized
         self.setWindowTitle("NPU Streaming Music Enhancer")
         self.setMinimumSize(1120, 760)
 
         self.profile_combo = QComboBox()
         self.profile_combo.addItems(sorted(available_profiles()))
-        self.profile_combo.setCurrentText("holographic-vocal-stage")
+        self.profile_combo.setCurrentText(self.settings.profile)
+        self.profile_combo.currentTextChanged.connect(self._save_current_settings)
         self.latency_combo = QComboBox()
         self.latency_combo.addItems(
             [
@@ -41,13 +46,18 @@ class EnhancerWindow(QMainWindow):
                 "Virtual output - compatibility",
             ]
         )
+        self.latency_combo.setCurrentText(self.settings.latency_path)
+        self.latency_combo.currentTextChanged.connect(self._save_current_settings)
         self.spotify_check = QCheckBox("Spotify")
         self.apple_music_check = QCheckBox("Apple Music")
         self.youtube_music_check = QCheckBox("YouTube Music")
+        self.spotify_check.setChecked(self.settings.spotify)
+        self.apple_music_check.setChecked(self.settings.apple_music)
+        self.youtube_music_check.setChecked(self.settings.youtube_music)
         for checkbox in (self.spotify_check, self.apple_music_check, self.youtube_music_check):
-            checkbox.setChecked(True)
+            checkbox.stateChanged.connect(self._save_current_settings)
 
-        self.recommendation_tick = 0
+        self.recommendation_tick = self.settings.recommendation_tick
         self.npu_meter = QProgressBar()
         self.npu_meter.setRange(0, 100)
         self.npu_meter.setValue(92)
@@ -66,6 +76,11 @@ class EnhancerWindow(QMainWindow):
         self.recommendation_label.setObjectName("resultLabel")
 
         self._build_ui()
+        if self.settings.active_on_start:
+            self._start_realtime(save=False)
+            self.status_label.setText(
+                "前回の ACTIVE 設定を復元しました。デスクトップログイン時は Cursor を開かずに自動で有効化します。"
+            )
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -109,6 +124,7 @@ class EnhancerWindow(QMainWindow):
         form.addRow("プロファイル", self.profile_combo)
         form.addRow("低レイテンシ出力", self.latency_combo)
         form.addRow("NPU オフロード目標", self.npu_meter)
+        form.addRow("自動有効化", QLabel("ログイン時に前回の ACTIVE 状態を復元します"))
         control_layout.addLayout(form)
 
         actions = QVBoxLayout()
@@ -291,7 +307,22 @@ class EnhancerWindow(QMainWindow):
             buffer_plan=LowLatencyBufferPlan(buffer_samples=32, sample_rate=48_000),
         )
 
-    def _start_realtime(self) -> None:
+    def _current_settings(self, *, active: bool | None = None) -> AppSettings:
+        return AppSettings(
+            spotify=self.spotify_check.isChecked(),
+            apple_music=self.apple_music_check.isChecked(),
+            youtube_music=self.youtube_music_check.isChecked(),
+            profile=self.profile_combo.currentText(),
+            latency_path=self.latency_combo.currentText(),
+            active_on_start=self.settings.active_on_start if active is None else active,
+            recommendation_tick=self.recommendation_tick,
+        )
+
+    def _save_current_settings(self) -> None:
+        self.settings = self._current_settings()
+        save_settings(self.settings)
+
+    def _start_realtime(self, *, save: bool = True) -> None:
         if not self._service_state().selected_services():
             self.state_label.setText("STATE: NEED SERVICE / 対象サービス未選択")
             self.status_label.setText("対象サービスを少なくとも 1 つ選択してください。")
@@ -306,6 +337,9 @@ class EnhancerWindow(QMainWindow):
             "Snapdragon X NPU + ONNX Runtime QNN + SABAJ A20D(ES) / XMOS USB DAC 極小バッファへ接続します。"
         )
         self.result_label.setText(build_realtime_status(self._service_state(), active=True))
+        if save:
+            self.settings = self._current_settings(active=True)
+            save_settings(self.settings)
 
     def _stop_realtime(self) -> None:
         self.state_label.setText("STATE: STANDBY / 待機中")
@@ -313,6 +347,8 @@ class EnhancerWindow(QMainWindow):
         self.npu_meter.setValue(92)
         self.status_label.setText("リアルタイム NPU 処理を停止しました。")
         self.result_label.setText(build_realtime_status(self._service_state(), active=False))
+        self.settings = self._current_settings(active=False)
+        save_settings(self.settings)
 
     def _apply_recommendations(self) -> None:
         self.recommendation_tick += 1
@@ -323,6 +359,8 @@ class EnhancerWindow(QMainWindow):
             f"Deep Learning AI レコメンドを更新しました (realtime tick #{self.recommendation_tick})。実機では Spotify / Apple Music / "
             "YouTube Music のプレイリスト候補と次候補キューへリアルタイム反映します。"
         )
+        self.settings = self._current_settings(active=True)
+        save_settings(self.settings)
 
 
 def create_app() -> QApplication:
@@ -332,10 +370,24 @@ def create_app() -> QApplication:
     return app
 
 
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Launch the NPU audio enhancer desktop app")
+    parser.add_argument(
+        "--start-minimized",
+        action="store_true",
+        help="Start hidden in the taskbar after restoring the previous active state",
+    )
+    return parser
+
+
 def main() -> int:
+    args = build_parser().parse_args()
     app = create_app()
-    window = EnhancerWindow()
-    window.show()
+    window = EnhancerWindow(start_minimized=args.start_minimized)
+    if args.start_minimized:
+        window.showMinimized()
+    else:
+        window.show()
     return app.exec()
 
 

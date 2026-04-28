@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 import wave
+from pathlib import Path
 from unittest import mock
 
 from npu_audio_enhancer.audio import AudioBuffer, enhance_audio, generate_demo_buffer, read_wav, write_wav
@@ -13,6 +14,7 @@ from npu_audio_enhancer.realtime import (
     ServiceState,
     build_realtime_status,
 )
+from npu_audio_enhancer.settings import AppSettings, load_settings, save_settings
 
 
 class AudioPipelineTest(unittest.TestCase):
@@ -123,6 +125,29 @@ class AudioPipelineTest(unittest.TestCase):
         self.assertIn("Realtime update tick: #1", status)
         self.assertIn("Top realtime picks:", status)
         self.assertIn("Spotify / Apple Music / YouTube Music", status)
+
+    def test_settings_round_trip_remembers_active_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            settings = AppSettings(
+                spotify=False,
+                apple_music=True,
+                youtube_music=True,
+                profile="holographic-vocal-stage",
+                latency_path="ASIO XMOS USB DAC - extreme low latency",
+                active_on_start=True,
+                recommendation_tick=7,
+            )
+
+            save_settings(settings, path)
+            loaded = load_settings(path)
+
+        self.assertFalse(loaded.spotify)
+        self.assertTrue(loaded.apple_music)
+        self.assertTrue(loaded.youtube_music)
+        self.assertEqual(loaded.profile, "holographic-vocal-stage")
+        self.assertTrue(loaded.active_on_start)
+        self.assertEqual(loaded.recommendation_tick, 7)
 
 
 if __name__ == "__main__":
