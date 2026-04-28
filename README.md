@@ -123,3 +123,51 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、まずサービス非依存の PCM 後処理コアを
+`src/npu_audio_enhancer/` に実装しています。
+
+- `AudioEnhancementPipeline`: 48 kHz / stereo float PCM の短時間フレームを
+  ラウドネス正規化、軽量 EQ、ステレオ幅保護、true peak ceiling で処理します。
+- `get_service_profile()`: Spotify、Apple Music、YouTube Music 向けのローカル
+  音作りプリセットを返します。アプリ内部 API や推薦ランキングは変更しません。
+- `select_backend()`: Snapdragon X では ONNX Runtime QNN Execution Provider を優先し、
+  DirectML、CPU の順に安全な fallback を選びます。
+- `run_personalization_inference()`: 将来の小型 NPU モデルと同じ出力契約を持つ、
+  決定的な CPU fallback です。
+
+### Python での最小利用例
+
+```python
+from npu_audio_enhancer import AudioEnhancementPipeline, EnhancementSettings
+
+pipeline = AudioEnhancementPipeline(
+    EnhancementSettings(
+        target_rms_dbfs=-18.0,
+        bass_gain_db=1.5,
+        presence_gain_db=1.0,
+        true_peak_ceiling=0.98,
+    )
+)
+
+# 10 ms at 48 kHz: tuple[(left_float, right_float), ...]
+processed_frame = pipeline.process(input_frame)
+```
+
+### バックエンド選択
+
+実機で QNN を試す場合は、ONNX Runtime QNN Execution Provider を含む ARM64
+環境で実行します。診断やテストでは以下の環境変数で挙動を固定できます。
+
+```bash
+NPU_AUDIO_FORCE_BACKEND=cpu python -m pytest
+NPU_AUDIO_DISABLE_QNN=1 NPU_AUDIO_DISABLE_DIRECTML=1 python -m pytest
+```
+
+### テスト
+
+```bash
+python -m pytest
+```

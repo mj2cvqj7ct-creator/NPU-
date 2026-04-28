@@ -1,0 +1,24 @@
+[project]
+name = "snapdragon-npu-audio-enhancer"
+version = "0.1.0"
+description = "Prototype DSP and NPU backend scaffold for Snapdragon X audio enhancement"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Cursor Automation" }]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest"]
+onnx = ["onnxruntime"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
