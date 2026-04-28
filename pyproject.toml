@@ -1,0 +1,9 @@
+[project]
+name = "snapdragon-x-npu-audio-enhancer"
+version = "0.1.0"
+description = "Prototype system-wide PCM audio enhancer for Snapdragon X ARM64 PCs."
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
