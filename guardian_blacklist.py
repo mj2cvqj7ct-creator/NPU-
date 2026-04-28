@@ -16,8 +16,10 @@ import json
 import os
 import platform
 import re
+import shlex
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
@@ -25,6 +27,7 @@ from typing import Iterable
 
 APP_NAME = "guardian-blacklist"
 IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+DEFAULT_SCAN_INTERVAL_SECONDS = 30
 
 
 @dataclass(frozen=True)
@@ -126,6 +129,43 @@ def format_command(command: list[str]) -> str:
     return " ".join(command)
 
 
+def shell_join(command: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in command)
+
+
+def scan_log_file(
+    data_dir: Path,
+    log_file: Path,
+    threshold: int,
+    reason: str,
+) -> list[BlacklistEntry]:
+    store = BlacklistStore(data_dir)
+    text = log_file.read_text(encoding="utf-8", errors="replace")
+    counts: dict[str, int] = {}
+    for candidate in IP_RE.findall(text):
+        try:
+            ip = validate_blockable_ip(candidate)
+        except argparse.ArgumentTypeError:
+            continue
+        counts[ip] = counts.get(ip, 0) + 1
+
+    added_entries: list[BlacklistEntry] = []
+    for ip, count in sorted(counts.items()):
+        if count < threshold:
+            continue
+        evidence = f"{log_file} mentions this IP {count} times"
+        entry = BlacklistEntry(
+            ip=ip,
+            reason=reason,
+            source=str(log_file),
+            evidence=evidence,
+            created_at=utc_now(),
+        )
+        if store.add(entry):
+            added_entries.append(entry)
+    return added_entries
+
+
 def add_entry(args: argparse.Namespace) -> int:
     store = BlacklistStore(args.data_dir)
     entry = BlacklistEntry(
@@ -161,32 +201,106 @@ def list_entries(args: argparse.Namespace) -> int:
 
 
 def scan_log(args: argparse.Namespace) -> int:
-    store = BlacklistStore(args.data_dir)
-    text = args.log_file.read_text(encoding="utf-8", errors="replace")
-    counts: dict[str, int] = {}
-    for candidate in IP_RE.findall(text):
-        try:
-            ip = validate_blockable_ip(candidate)
-        except argparse.ArgumentTypeError:
-            continue
-        counts[ip] = counts.get(ip, 0) + 1
+    added_entries = scan_log_file(args.data_dir, args.log_file, args.threshold, args.reason)
+    for entry in added_entries:
+        print(f"added {entry.ip}: {entry.evidence}")
+    print(f"scan complete: {len(added_entries)} new entries")
+    return 0
 
-    added = 0
-    for ip, count in sorted(counts.items()):
-        if count < args.threshold:
-            continue
-        evidence = f"{args.log_file} mentions this IP {count} times"
-        entry = BlacklistEntry(
-            ip=ip,
-            reason=args.reason,
-            source=str(args.log_file),
-            evidence=evidence,
-            created_at=utc_now(),
+
+def apply_firewall_for_entries(
+    entries: Iterable[BlacklistEntry],
+    system: str | None = None,
+) -> None:
+    for entry in entries:
+        for command in firewall_commands(entry.ip, system):
+            print(format_command(command))
+            subprocess.run(command, check=True)
+
+
+def watch_log(args: argparse.Namespace) -> int:
+    while True:
+        if args.log_file.exists():
+            added_entries = scan_log_file(
+                args.data_dir,
+                args.log_file,
+                args.threshold,
+                args.reason,
+            )
+            for entry in added_entries:
+                print(f"added {entry.ip}: {entry.evidence}", flush=True)
+            if args.apply and added_entries:
+                apply_firewall_for_entries(added_entries, args.system)
+        else:
+            print(f"waiting for log file: {args.log_file}", flush=True)
+
+        if args.once:
+            return 0
+        time.sleep(args.interval)
+
+
+def systemd_user_service_dir() -> Path:
+    return Path.home() / ".config" / "systemd" / "user"
+
+
+def build_watch_command(args: argparse.Namespace) -> list[str]:
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--data-dir",
+        str(args.data_dir),
+        "watch-log",
+        str(args.log_file),
+        "--threshold",
+        str(args.threshold),
+        "--interval",
+        str(args.interval),
+        "--reason",
+        args.reason,
+    ]
+    if args.apply:
+        command.append("--apply")
+    return command
+
+
+def install_autostart(args: argparse.Namespace) -> int:
+    if platform.system() != "Linux":
+        print("install-autostart currently writes a Linux systemd user service only")
+        return 2
+
+    service_dir = args.service_dir or systemd_user_service_dir()
+    service_dir.mkdir(parents=True, exist_ok=True)
+    service_path = service_dir / f"{APP_NAME}.service"
+    exec_start = shell_join(build_watch_command(args))
+    service_path.write_text(
+        "\n".join(
+            [
+                "[Unit]",
+                "Description=Guardian Blacklist local log watcher",
+                "After=default.target",
+                "",
+                "[Service]",
+                "Type=simple",
+                f"ExecStart={exec_start}",
+                "Restart=on-failure",
+                "RestartSec=10",
+                "",
+                "[Install]",
+                "WantedBy=default.target",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    print(f"wrote autostart service to {service_path}")
+    print("enable with: systemctl --user enable --now guardian-blacklist.service")
+
+    if args.enable:
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+        subprocess.run(
+            ["systemctl", "--user", "enable", "--now", f"{APP_NAME}.service"],
+            check=True,
         )
-        if store.add(entry):
-            added += 1
-            print(f"added {ip}: {evidence}")
-    print(f"scan complete: {added} new entries")
     return 0
 
 
@@ -275,6 +389,53 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--threshold", type=int, default=5)
     scan.add_argument("--reason", default="Repeated suspicious log activity")
     scan.set_defaults(func=scan_log)
+
+    watch = subparsers.add_parser(
+        "watch-log",
+        help="run continuously and add public IPs seen repeatedly in a log file",
+    )
+    watch.add_argument("log_file", type=Path)
+    watch.add_argument("--threshold", type=int, default=5)
+    watch.add_argument("--reason", default="Repeated suspicious log activity")
+    watch.add_argument("--interval", type=int, default=DEFAULT_SCAN_INTERVAL_SECONDS)
+    watch.add_argument("--system", choices=["Linux", "Darwin", "Windows"], default=None)
+    watch.add_argument(
+        "--apply",
+        action="store_true",
+        help="run local firewall commands for newly added entries",
+    )
+    watch.add_argument(
+        "--once",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    watch.set_defaults(func=watch_log)
+
+    autostart = subparsers.add_parser(
+        "install-autostart",
+        help="write a startup service that runs watch-log when the user logs in",
+    )
+    autostart.add_argument("log_file", type=Path)
+    autostart.add_argument("--threshold", type=int, default=5)
+    autostart.add_argument("--reason", default="Repeated suspicious log activity")
+    autostart.add_argument("--interval", type=int, default=DEFAULT_SCAN_INTERVAL_SECONDS)
+    autostart.add_argument(
+        "--apply",
+        action="store_true",
+        help="include local firewall application in the autostart watcher",
+    )
+    autostart.add_argument(
+        "--enable",
+        action="store_true",
+        help="run systemctl --user enable --now after writing the service",
+    )
+    autostart.add_argument(
+        "--service-dir",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    autostart.set_defaults(func=install_autostart)
 
     report_cmd = subparsers.add_parser("report", help="write a manual report")
     report_cmd.add_argument("output", type=Path)

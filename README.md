@@ -18,8 +18,20 @@ python3 guardian_blacklist.py add 8.8.8.8 \
 ```bash
 python3 guardian_blacklist.py list
 python3 guardian_blacklist.py scan-log ./security.log --threshold 5
+python3 guardian_blacklist.py watch-log ./security.log --threshold 5
 python3 guardian_blacklist.py report ./incident_report.md
 ```
+
+## 起動時に自動開始する
+
+Linuxでは、ログイン時に常駐監視を開始するsystemd user serviceを生成できます。
+
+```bash
+python3 guardian_blacklist.py install-autostart ./security.log --threshold 5
+systemctl --user enable --now guardian-blacklist.service
+```
+
+`install-autostart --enable` を指定すると、サービスファイル生成後に `systemctl --user enable --now` まで実行します。実際にローカルファイアウォールへ適用する場合は `--apply` を追加してください。管理者権限やOS側のファイアウォール設定が必要になることがあります。
 
 ## 保存先
 
@@ -31,3 +43,4 @@ python3 guardian_blacklist.py report ./incident_report.md
 - プライベート、ループバック、予約済み、マルチキャストIPは拒否します。
 - 外部機関への送信や登録は行いません。
 - レポートは手動確認・手動提出用です。
+- 常駐監視はローカルログの解析とローカルブラックリスト登録だけを行います。
