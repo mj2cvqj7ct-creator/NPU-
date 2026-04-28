@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモ兼プロトタイプです。
 
 ## 重要な前提
 
@@ -8,6 +8,25 @@ ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube
 - 実装対象は、各アプリから OS に出力された PCM 音声を取得し、低遅延で補正して再生デバイスへ戻す「システムワイド音声エンハンサー」です。
 - Snapdragon X の NPU は、ニューラル音声補正、軽量超解像、楽曲特徴抽出、ユーザー嗜好推定などの推論処理に使います。
 - DRM、各サービスの利用規約、プライバシーを尊重し、録音保存やストリームの再配布は行いません。
+
+## 現在の実装
+
+このブランチでは、実機 WASAPI / QNN 統合の前段として、WAV/PCM で検証できる音声補正コアを追加しています。
+
+- `src/npu_audio_enhancer/dsp.py`: ラウドネス推定、トーン shaping、軽量コンプレッション、ステレオ幅制御、true peak limiter
+- `src/npu_audio_enhancer/inference.py`: Snapdragon X NPU / ONNX Runtime QNN / DirectML / CPU fallback のバックエンド選択抽象化
+- `src/npu_audio_enhancer/profiles.py`: Spotify、Apple Music、YouTube Music、Snapdragon X NPU 向けの安全な後処理プリセット
+- `src/npu_audio_enhancer/audio.py`: 16-bit PCM WAV 入出力とデモ信号生成
+- `tests/test_audio_pipeline.py`: NPU fallback と DSP のピーク制御を検証する自動テスト
+
+### ローカルで試す
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+PYTHONPATH=src python3 -m npu_audio_enhancer --demo demo.wav enhanced.wav --profile snapdragon-x-npu --backend auto
+```
+
+Snapdragon X NPU 実機では、QNN 対応 ONNX Runtime を組み込んだあと、同じ DSP パイプラインに NPU 推論結果のゲイン係数を供給します。現在の実装は、NPU がない環境では CPU fallback の決定論的な特徴推定で同じインターフェイスを検証します。
 
 ## 目標
 
@@ -95,7 +114,7 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 1. WASAPI loopback の最小プロトタイプを作る。
 2. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。
-3. ルールベースのラウドネス補正、EQ、limiter を追加する。
+3. ルールベースのラウドネス補正、EQ、limiter を追加する。(WAV/PCM プロトタイプ実装済み)
 4. ONNX Runtime QNN Execution Provider で ARM64 / Snapdragon X NPU 推論を試す。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
@@ -119,7 +138,7 @@ Snapdragon X では、以下の順で実装候補を検討します。
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
+- `src/dsp/`: EQ、limiter、loudness normalization (Python プロトタイプ済み)
+- `src/inference/`: ONNX Runtime QNN integration (バックエンド抽象化済み)
 - `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- `tests/`: WAV 入出力による DSP の自動テスト (追加済み)
