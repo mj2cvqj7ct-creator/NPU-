@@ -400,6 +400,13 @@ def evidence_digest(entries: Iterable[BlacklistEntry]) -> str:
 
 
 def report_contacts(audience: str) -> list[str]:
+    if audience == "japan-international":
+        return [
+            "- Japanese police cybercrime consultation desk, using its official channel",
+            "- JPCERT/CC or the relevant national CERT/CSIRT official reporting channel",
+            "- The affected network owner's official abuse or security desk",
+            "- International anti-phishing or malware reporting portals, when relevant",
+        ]
     if audience == "international":
         return [
             "- Your national CERT/CSIRT official reporting channel",
@@ -534,7 +541,7 @@ def build_parser() -> argparse.ArgumentParser:
     report_cmd.add_argument("output", type=Path)
     report_cmd.add_argument(
         "--audience",
-        choices=["general", "public", "international"],
+        choices=["general", "public", "international", "japan-international"],
         default="general",
         help="tailor manual contact suggestions without submitting anything",
     )

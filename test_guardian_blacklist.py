@@ -43,6 +43,7 @@ class GuardianBlacklistTest(unittest.TestCase):
             report_text = report_path.read_text(encoding="utf-8")
             self.assertIn("8.8.8.8", report_text)
             self.assertIn("Intended audience: international", report_text)
+            self.assertIn("JPCERT/CC", report_text)
             self.assertIn("national CERT/CSIRT", report_text)
             self.assertIn("does not automatically register", report_text)
             self.assertIn("international organizations", report_text)

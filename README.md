@@ -21,6 +21,7 @@ python3 guardian_blacklist.py scan-log ./security.log --threshold 5
 python3 guardian_blacklist.py watch-log ./security.log --threshold 5
 python3 guardian_blacklist.py report ./incident_report.md
 python3 guardian_blacklist.py report ./international_report.md --audience international
+python3 guardian_blacklist.py report ./japan_international_report.md --audience japan-international
 ```
 
 ## Cursorなしで起動時に自動開始する
