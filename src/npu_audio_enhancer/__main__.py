@@ -4,7 +4,8 @@ import argparse
 from pathlib import Path
 
 from .audio import enhance_wav, generate_demo_wav
-from .profiles import available_profiles
+from .inference import build_inference_plan_text
+from .profiles import available_profiles, available_services
 from .recommender import build_recommendation_status, generate_recommendations
 from .realtime import ServiceState, build_realtime_status
 
@@ -21,9 +22,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("output", nargs="?", type=Path, help="Enhanced output WAV file")
     parser.add_argument(
         "--profile",
-        default="balanced",
-        choices=sorted(available_profiles()),
+        default="streaming-master",
+        choices=available_profiles(),
         help="Processing profile to apply",
+    )
+    parser.add_argument(
+        "--services",
+        default="spotify,apple-music,youtube-music",
+        help=(
+            "Comma-separated service hints for PCM post-processing "
+            f"({', '.join(available_services())})."
+        ),
     )
     parser.add_argument(
         "--generate-demo",
@@ -41,6 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print realtime deep-learning recommendation status and exit",
     )
+    parser.add_argument(
+        "--inference-plan",
+        action="store_true",
+        help="Print the Snapdragon X NPU execution/fallback plan and exit",
+    )
     return parser
 
 
@@ -53,15 +67,12 @@ def main() -> None:
         print(f"Generated demo WAV: {args.generate_demo}")
         return
 
+    services = _parse_services(args.services)
+
     if args.realtime_status:
         print(
             build_realtime_status(
-                ServiceState(
-                    spotify=True,
-                    apple_music=True,
-                    youtube_music=True,
-                    profile=args.profile,
-                ),
+                ServiceState.from_services(services, args.profile),
                 active=True,
             )
         )
@@ -71,16 +82,40 @@ def main() -> None:
         print(build_recommendation_status(generate_recommendations()))
         return
 
+    if args.inference_plan:
+        print(build_inference_plan_text(args.profile, services))
+        return
+
     if args.input is None or args.output is None:
         parser.error("input and output are required unless --generate-demo is used")
 
-    report = enhance_wav(args.input, args.output, args.profile)
+    report = enhance_wav(args.input, args.output, args.profile, services=services)
     print(f"Profile: {report.profile.name}")
     print(f"Target backend: {report.profile.target_backend}")
+    print(f"Services: {', '.join(report.services)}")
     print(f"Samples: {report.samples}")
     print(f"Input peak: {report.input_peak:.4f}")
     print(f"Output peak: {report.output_peak:.4f}")
     print(f"Wrote: {args.output}")
+
+
+def _parse_services(raw_services: str) -> tuple[str, ...]:
+    services: list[str] = []
+    for item in raw_services.split(","):
+        key = item.strip().lower()
+        if not key:
+            continue
+        service = key.replace("_", "-").replace(" ", "-")
+        if service == "apple":
+            service = "apple-music"
+        elif service in {"youtube", "ytmusic"}:
+            service = "youtube-music"
+        if service not in available_services() or service == "generic":
+            available = ", ".join(service for service in available_services() if service != "generic")
+            raise SystemExit(f"unknown service '{item}'. Available service hints: {available}")
+        if service not in services:
+            services.append(service)
+    return tuple(services)
 
 
 if __name__ == "__main__":

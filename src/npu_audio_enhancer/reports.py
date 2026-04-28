@@ -8,8 +8,11 @@ def build_status_text(report: EnhancementReport) -> str:
         [
             f"Profile: {report.profile.name}",
             f"Target backend: {report.profile.target_backend}",
+            f"Services: {', '.join(report.services)}",
             f"Samples: {report.samples}",
             f"Input peak: {report.input_peak:.4f}",
             f"Output peak: {report.output_peak:.4f}",
+            f"Input RMS: {report.input_rms:.4f}",
+            f"Output RMS: {report.output_rms:.4f}",
         ]
     )

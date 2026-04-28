@@ -5,6 +5,7 @@ import wave
 from unittest import mock
 
 from npu_audio_enhancer.audio import AudioBuffer, enhance_audio, generate_demo_buffer, read_wav, write_wav
+from npu_audio_enhancer.inference import build_control_vector, build_inference_plan_text
 from npu_audio_enhancer.profiles import get_profile
 from npu_audio_enhancer.recommender import RecommendationEngine, build_demo_catalog, build_recommendation_status
 from npu_audio_enhancer.reports import build_status_text
@@ -51,6 +52,30 @@ class AudioPipelineTest(unittest.TestCase):
 
         self.assertGreater(_band_delta_energy(holographic.samples), _band_delta_energy(balanced.samples))
 
+    def test_streaming_master_services_change_pcm_result(self) -> None:
+        audio = generate_demo_buffer(duration_seconds=0.08)
+        profile = get_profile("streaming-master")
+
+        spotify = enhance_audio(audio, profile, services=("Spotify",))
+        youtube = enhance_audio(audio, profile, services=("YouTube Music",))
+
+        self.assertLessEqual(max(abs(sample) for sample in spotify.samples), 0.911)
+        self.assertLessEqual(max(abs(sample) for sample in youtube.samples), 0.911)
+        self.assertNotEqual(spotify.samples[200:260], youtube.samples[200:260])
+
+    def test_npu_plan_describes_service_control_vectors(self) -> None:
+        profile = get_profile("streaming-master")
+
+        spotify = build_control_vector(profile, "Spotify")
+        youtube = build_control_vector(profile, "YouTube Music")
+        plan = build_inference_plan_text("streaming-master", ("Spotify", "YouTube Music"))
+
+        self.assertGreater(youtube.deartifact, spotify.deartifact)
+        self.assertIn("ONNX Runtime QNN Execution Provider", plan)
+        self.assertIn("snapdragon-x-streaming-master-20ms.onnx", plan)
+        self.assertIn("Service: Spotify", plan)
+        self.assertIn("Service: YouTube Music", plan)
+
     def test_wav_round_trip(self) -> None:
         audio = generate_demo_buffer(duration_seconds=0.05)
 
@@ -74,6 +99,9 @@ class AudioPipelineTest(unittest.TestCase):
         report.samples = 96_000
         report.input_peak = 0.878
         report.output_peak = 0.763
+        report.input_rms = 0.180
+        report.output_rms = 0.204
+        report.services = ("Spotify", "Apple Music")
 
         status = build_status_text(report)
 
@@ -81,6 +109,8 @@ class AudioPipelineTest(unittest.TestCase):
         self.assertIn("Target backend: onnxruntime-qnn", status)
         self.assertIn("Samples: 96000", status)
         self.assertIn("Output peak: 0.7630", status)
+        self.assertIn("Output RMS: 0.2040", status)
+        self.assertIn("Services: Spotify, Apple Music", status)
 
     def test_realtime_status_mentions_npu_streaming_requirements(self) -> None:
         status = build_realtime_status(

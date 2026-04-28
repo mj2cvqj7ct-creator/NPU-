@@ -12,9 +12,12 @@ ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube
 
 - デスクトップアプリは、Spotify、Apple Music、YouTube Music のリアルタイム再生音を処理するための NPU コントロール画面です。
 - Snapdragon X NPU を ONNX Runtime QNN Execution Provider で使う構成を前提にしています。
+- `streaming-master` プロファイルは、3 サービス共通の OS 出力 PCM に対して RMS 整合、帯域別コンプレッション、トランジェント補正、擬似ニューラル detail 復元、true peak 保護をまとめて実行します。
+- `--services spotify,apple-music,youtube-music` で対象サービスのローカル補正ヒントを指定できます。Spotify は codec/ラウドネス補正、Apple Music は lossless/headphone 前提の自然さ、YouTube Music は動画由来の音量差と codec ばらつきを重点的に扱います。
+- `--inference-plan` は、20 ms フレームの ONNX/QNN 実行計画とサービス別 control vector を表示します。クラウドでは同じ係数を CPU で検証し、Windows ARM64 実機では QNN Execution Provider に差し替える設計です。
 - ASIO の SABAJ A20D(ES) / XMOS USB DAC Driver Control Panel を低レイテンシ出力経路として想定し、極小バッファ、排他出力、NPU 直後の最短出力を画面に表示します。
 - `holographic-vocal-stage` プロファイルで、定位、ホログラフィックな奥行き、楽器分離、ボーカルの前景化を狙います。
-- WAV 検証用パイプラインは、ピーク正規化、帯域別フォーカス、ボーカル帯域強調、mid/side ステレオ拡張、ソフトクリップを実行します。
+- WAV 検証用パイプラインは、ピーク正規化、RMS ターゲット、帯域別フォーカス、ボーカル帯域強調、mid/side ステレオ拡張、ソフトクリップを実行します。
 - Deep Learning 型のローカル推薦 AI が、Spotify、Apple Music、YouTube Music の履歴/プレイリスト信号を埋め込み化し、リアルタイムの次候補キューや同期プレイリスト案として反映します。
 - WAV 音声に対して、ピーク正規化、軽いダイナミックレンジ圧縮、ソフトクリップを適用するローカル検証用 CLI もあります。
 - CLI は `--profile snapdragon-x-npu` で、Snapdragon X NPU ターゲットのプロファイルを選べます。
@@ -51,7 +54,8 @@ bash scripts/linux/install_cursor_desktop_launcher.sh
 
 ```bash
 python3 -m npu_audio_enhancer --generate-demo demo_input.wav
-python3 -m npu_audio_enhancer demo_input.wav demo_enhanced.wav --profile holographic-vocal-stage
+python3 -m npu_audio_enhancer demo_input.wav demo_enhanced.wav --profile streaming-master --services spotify,apple-music,youtube-music
+python3 -m npu_audio_enhancer --profile streaming-master --services spotify,apple-music,youtube-music --inference-plan
 npu-audio-enhancer-gui
 ```
 
