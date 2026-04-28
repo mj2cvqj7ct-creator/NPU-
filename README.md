@@ -43,3 +43,16 @@ python3 windows_ldac_assistant.py monitor
 ```
 
 Windows では設定を現在の Windows ユーザーに紐づく DPAPI で保護し、`--start-on-login` を指定すると `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に監視コマンドを登録します。実際に登録する場合は Windows 上で `--dry-run` を外して実行してください。
+
+## Audio Lossless Assistant
+
+MP3、AAC、LDAC、SBC などの非可逆コーデックで一度失われた音声情報は、後からどのアプリでも完全復元できません。この補助アプリは「全コーデックをロスレス化」と偽らず、入力コーデックがロスレスか判定し、FLAC、ALAC、WAV/PCM などの実際のロスレス保存先への保全計画を作成します。
+
+```bash
+python3 audio_lossless_assistant.py assess mp3
+python3 audio_lossless_assistant.py assess flac
+python3 audio_lossless_assistant.py plan ldac --target-codec flac
+python3 audio_lossless_assistant.py plan wav --target-codec alac --output ./lossless_plan.json
+```
+
+非可逆コーデックからロスレス形式へ変換する場合、保存できるのは「デコード後に残っている波形」だけです。元ファイルを必ず保持し、出力には `preserved-from-lossy` のように復元ではないことを明記してください。
