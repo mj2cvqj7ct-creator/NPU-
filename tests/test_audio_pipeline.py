@@ -1,8 +1,11 @@
 import math
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 import wave
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from snapdragon_npu_audio_enhancer.audio import AudioBuffer, read_wav, write_wav
 from snapdragon_npu_audio_enhancer.dsp import extract_features, true_peak_limiter

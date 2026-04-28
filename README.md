@@ -130,7 +130,7 @@ Snapdragon X では、以下の順で実装候補を検討します。
 依存関係なしの Python オフラインプロトタイプを含めています。
 
 ```bash
-PYTHONPATH=src python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
+PYTHONPATH=src python3 -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
 ```
 
 主な処理は以下です。

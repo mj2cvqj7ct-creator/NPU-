@@ -49,7 +49,7 @@ class AudioBuffer:
 def read_wav(path: str) -> AudioBuffer:
     """Read 16-bit PCM or 32-bit float WAV and convert it to stereo float audio."""
 
-    with wave.open(path, "rb") as wav_file:
+    with wave.open(str(path), "rb") as wav_file:
         channels = wav_file.getnchannels()
         sample_width = wav_file.getsampwidth()
         sample_rate = wav_file.getframerate()
@@ -86,7 +86,7 @@ def read_wav(path: str) -> AudioBuffer:
 def write_wav(path: str, audio: AudioBuffer) -> None:
     """Write stereo float audio as clipped 16-bit PCM WAV."""
 
-    with wave.open(path, "wb") as wav_file:
+    with wave.open(str(path), "wb") as wav_file:
         wav_file.setnchannels(2)
         wav_file.setsampwidth(2)
         wav_file.setframerate(audio.sample_rate)
