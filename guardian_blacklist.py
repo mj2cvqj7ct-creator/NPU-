@@ -40,6 +40,12 @@ PROTOCOL_RE = re.compile(
 DEFAULT_SCAN_INTERVAL_SECONDS = 1
 DEFAULT_PORT_SCAN_THRESHOLD = 10
 DEFAULT_ABUSEIPDB_CATEGORIES = "14,15"
+DEFAULT_THREAT_INTEL_SERVICES = ["abuseipdb", "alienvault-otx", "ibm-xforce"]
+THREAT_INTEL_FILENAMES = {
+    "abuseipdb": "abuseipdb_manual.json",
+    "alienvault-otx": "alienvault_otx_manual.json",
+    "ibm-xforce": "ibm_xforce_manual.json",
+}
 
 
 @dataclass(frozen=True)
@@ -324,6 +330,10 @@ def systemd_system_service_dir() -> Path:
     return Path("/etc/systemd/system")
 
 
+def systemd_user_timer_dir() -> Path:
+    return systemd_user_service_dir()
+
+
 def build_watch_command(args: argparse.Namespace) -> list[str]:
     command = [
         sys.executable,
@@ -357,6 +367,21 @@ def build_watch_command(args: argparse.Namespace) -> list[str]:
     return command
 
 
+def build_weekly_export_command(args: argparse.Namespace) -> list[str]:
+    return [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--data-dir",
+        str(args.data_dir),
+        "threat-intel-report",
+        str(args.output_dir),
+        "--services",
+        ",".join(args.services),
+        "--abuseipdb-categories",
+        args.abuseipdb_categories,
+    ]
+
+
 def write_systemd_service(
     service_path: Path,
     exec_start: str,
@@ -379,6 +404,53 @@ def write_systemd_service(
                 "",
                 "[Install]",
                 f"WantedBy={wanted_by}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_systemd_oneshot_service(
+    service_path: Path,
+    exec_start: str,
+    description: str,
+) -> None:
+    service_path.write_text(
+        "\n".join(
+            [
+                "[Unit]",
+                f"Description={description}",
+                "",
+                "[Service]",
+                "Type=oneshot",
+                f"ExecStart={exec_start}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_systemd_timer(
+    timer_path: Path,
+    unit_name: str,
+    description: str,
+    on_calendar: str,
+) -> None:
+    timer_path.write_text(
+        "\n".join(
+            [
+                "[Unit]",
+                f"Description={description}",
+                "",
+                "[Timer]",
+                f"OnCalendar={on_calendar}",
+                "Persistent=true",
+                f"Unit={unit_name}",
+                "",
+                "[Install]",
+                "WantedBy=timers.target",
                 "",
             ]
         ),
@@ -441,6 +513,42 @@ def install_boot_service(args: argparse.Namespace) -> int:
         subprocess.run([*prefix, "systemctl", "daemon-reload"], check=True)
         subprocess.run(
             [*prefix, "systemctl", "enable", "--now", f"{APP_NAME}.service"],
+            check=True,
+        )
+    return 0
+
+
+def install_weekly_export(args: argparse.Namespace) -> int:
+    if not ensure_linux("install-weekly-export", "user timer"):
+        return 2
+
+    service_dir = args.service_dir or systemd_user_service_dir()
+    timer_dir = args.timer_dir or systemd_user_timer_dir()
+    service_dir.mkdir(parents=True, exist_ok=True)
+    timer_dir.mkdir(parents=True, exist_ok=True)
+    service_name = f"{APP_NAME}-weekly-export.service"
+    timer_name = f"{APP_NAME}-weekly-export.timer"
+    service_path = service_dir / service_name
+    timer_path = timer_dir / timer_name
+    write_systemd_oneshot_service(
+        service_path,
+        shell_join(build_weekly_export_command(args)),
+        "Guardian Blacklist weekly manual threat intelligence export",
+    )
+    write_systemd_timer(
+        timer_path,
+        service_name,
+        "Guardian Blacklist weekly manual threat intelligence export timer",
+        args.on_calendar,
+    )
+    print(f"wrote weekly export service to {service_path}")
+    print(f"wrote weekly export timer to {timer_path}")
+    print(f"enable with: systemctl --user enable --now {timer_name}")
+
+    if args.enable:
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+        subprocess.run(
+            ["systemctl", "--user", "enable", "--now", timer_name],
             check=True,
         )
     return 0
@@ -584,6 +692,18 @@ def abuseipdb_comment(entry: BlacklistEntry) -> str:
     )
 
 
+def threat_intel_comment(entry: BlacklistEntry) -> str:
+    return (
+        f"{entry.reason}. Evidence: {entry.evidence}. "
+        f"Source retained locally: {entry.source}. "
+        "Manual review required before submitting to threat intelligence services."
+    )
+
+
+def indicator_type(ip: str) -> str:
+    return f"IPv{ipaddress.ip_address(ip).version}"
+
+
 def write_abuseipdb_report(
     data_dir: Path,
     output: Path,
@@ -635,10 +755,111 @@ def write_abuseipdb_report(
         )
 
 
+def write_otx_report(entries: list[BlacklistEntry], output: Path) -> None:
+    payload = {
+        "generated_at": utc_now(),
+        "manual_submission_only": True,
+        "does_not_submit_to_alienvault_otx": True,
+        "legal_note": (
+            "Review every indicator before submitting through official AlienVault "
+            "OTX channels. This tool does not call the OTX API."
+        ),
+        "indicators": [
+            {
+                "indicator": entry.ip,
+                "type": indicator_type(entry.ip),
+                "description": threat_intel_comment(entry),
+                "created_at": entry.created_at,
+            }
+            for entry in entries
+        ],
+    }
+    output.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_xforce_report(entries: list[BlacklistEntry], output: Path) -> None:
+    payload = {
+        "generated_at": utc_now(),
+        "manual_submission_only": True,
+        "does_not_submit_to_ibm_xforce": True,
+        "legal_note": (
+            "Review every IP before submitting through official IBM X-Force "
+            "Exchange channels. This tool does not call the X-Force API."
+        ),
+        "reports": [
+            {
+                "ip": entry.ip,
+                "type": indicator_type(entry.ip),
+                "reason": entry.reason,
+                "evidence": entry.evidence,
+                "source_retained_locally": entry.source,
+                "timestamp": entry.created_at,
+            }
+            for entry in entries
+        ],
+    }
+    output.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def parse_threat_intel_services(value: str) -> list[str]:
+    requested = [part.strip() for part in value.split(",") if part.strip()]
+    if not requested or requested == ["all"]:
+        return list(DEFAULT_THREAT_INTEL_SERVICES)
+
+    invalid = sorted(set(requested) - set(DEFAULT_THREAT_INTEL_SERVICES))
+    if invalid:
+        raise argparse.ArgumentTypeError(
+            "unsupported service(s): "
+            + ", ".join(invalid)
+            + "; use all, abuseipdb, alienvault-otx, or ibm-xforce"
+        )
+    return requested
+
+
+def write_threat_intel_reports(
+    data_dir: Path,
+    output_dir: Path,
+    services: list[str],
+    abuseipdb_categories: str,
+) -> list[Path]:
+    entries = BlacklistStore(data_dir).load()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for service in services:
+        output = output_dir / THREAT_INTEL_FILENAMES[service]
+        if service == "abuseipdb":
+            write_abuseipdb_report(data_dir, output, "json", abuseipdb_categories)
+        elif service == "alienvault-otx":
+            write_otx_report(entries, output)
+        elif service == "ibm-xforce":
+            write_xforce_report(entries, output)
+        written.append(output)
+    return written
+
+
 def abuseipdb_report(args: argparse.Namespace) -> int:
     write_abuseipdb_report(args.data_dir, args.output, args.format, args.categories)
     print(f"wrote AbuseIPDB manual report to {args.output}")
     print("manual submission only: no AbuseIPDB API call was made")
+    return 0
+
+
+def threat_intel_report(args: argparse.Namespace) -> int:
+    written = write_threat_intel_reports(
+        args.data_dir,
+        args.output_dir,
+        args.services,
+        args.abuseipdb_categories,
+    )
+    for path in written:
+        print(f"wrote manual threat intelligence report to {path}")
+    print("manual submission only: no OTX, X-Force, or AbuseIPDB API call was made")
     return 0
 
 
@@ -733,6 +954,64 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated AbuseIPDB category IDs to suggest after review",
     )
     abuseipdb.set_defaults(func=abuseipdb_report)
+
+    threat_intel = subparsers.add_parser(
+        "threat-intel-report",
+        help="write OTX, X-Force, and AbuseIPDB manual submission files",
+    )
+    threat_intel.add_argument("output_dir", type=Path)
+    threat_intel.add_argument(
+        "--services",
+        type=parse_threat_intel_services,
+        default=list(DEFAULT_THREAT_INTEL_SERVICES),
+        help="comma-separated services: all, abuseipdb, alienvault-otx, ibm-xforce",
+    )
+    threat_intel.add_argument(
+        "--abuseipdb-categories",
+        default=DEFAULT_ABUSEIPDB_CATEGORIES,
+        help="comma-separated AbuseIPDB category IDs to suggest after review",
+    )
+    threat_intel.set_defaults(func=threat_intel_report)
+
+    weekly = subparsers.add_parser(
+        "install-weekly-export",
+        help="write a weekly timer for manual threat intelligence export files",
+    )
+    weekly.add_argument("output_dir", type=Path)
+    weekly.add_argument(
+        "--services",
+        type=parse_threat_intel_services,
+        default=list(DEFAULT_THREAT_INTEL_SERVICES),
+        help="comma-separated services: all, abuseipdb, alienvault-otx, ibm-xforce",
+    )
+    weekly.add_argument(
+        "--abuseipdb-categories",
+        default=DEFAULT_ABUSEIPDB_CATEGORIES,
+        help="comma-separated AbuseIPDB category IDs to suggest after review",
+    )
+    weekly.add_argument(
+        "--on-calendar",
+        default="weekly",
+        help="systemd OnCalendar value for export cadence",
+    )
+    weekly.add_argument(
+        "--enable",
+        action="store_true",
+        help="enable and start the timer after writing it",
+    )
+    weekly.add_argument(
+        "--service-dir",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    weekly.add_argument(
+        "--timer-dir",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    weekly.set_defaults(func=install_weekly_export)
     return parser
 
 

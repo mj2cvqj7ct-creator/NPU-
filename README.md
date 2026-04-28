@@ -24,6 +24,7 @@ python3 guardian_blacklist.py report ./incident_report.md
 python3 guardian_blacklist.py report ./international_report.md --audience international
 python3 guardian_blacklist.py report ./japan_international_report.md --audience japan-international
 python3 guardian_blacklist.py abuseipdb-report ./abuseipdb_manual.json
+python3 guardian_blacklist.py threat-intel-report ./weekly_exports
 python3 guardian_blacklist.py watch-log ./security.log --abuseipdb-export ./abuseipdb_manual.json
 ```
 
@@ -43,6 +44,14 @@ python3 guardian_blacklist.py install-autostart ./security.log --threshold 5 --e
 
 既定の監視間隔は1秒です。より間隔を空けたい場合は `--interval` を指定してください。管理者権限やOS側のファイアウォール設定が必要になることがあります。
 
+## 週次で提出候補ファイルを生成する
+
+AlienVault OTX、IBM X-Force、AbuseIPDB向けに、週1回の手動提出用ファイル生成timerを作れます。外部API送信は行いません。
+
+```bash
+python3 guardian_blacklist.py install-weekly-export ./weekly_exports --enable
+```
+
 ## 保存先
 
 既定では `~/.local/share/guardian-blacklist/blacklist.json` に保存します。テストや別環境では `GUARDIAN_BLACKLIST_HOME` または `--data-dir` で変更できます。
@@ -53,5 +62,5 @@ python3 guardian_blacklist.py install-autostart ./security.log --threshold 5 --e
 - プライベート、ループバック、予約済み、マルチキャストIPは拒否します。
 - 外部機関への送信や登録は行いません。
 - レポートは手動確認・手動提出用です。
-- AbuseIPDB向けファイルは検知時に自動更新できますが、手動提出用でAPI送信は行いません。
+- AbuseIPDB、AlienVault OTX、IBM X-Force向けファイルは自動生成できますが、手動提出用でAPI送信は行いません。
 - 常駐監視はローカルログの解析、ポートスキャン/IPスキャン兆候とプロトコル情報の記録、ローカルブラックリスト登録だけを行います。

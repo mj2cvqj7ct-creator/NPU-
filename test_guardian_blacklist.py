@@ -139,6 +139,46 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertIn("Manual review required", report_text)
             self.assertIn("9.9.9.9", report_text)
 
+    def test_threat_intel_report_writes_all_manual_exports(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            output_dir = Path(temp_dir) / "exports"
+            store = gb.BlacklistStore(data_dir)
+            self.assertTrue(
+                store.add(
+                    gb.BlacklistEntry(
+                        ip="9.9.9.9",
+                        reason="Port scan detected",
+                        source="firewall.log",
+                        evidence="Observed TCP, UDP, and ICMP probes",
+                        created_at="2026-04-28T05:00:00+00:00",
+                    )
+                )
+            )
+            args = argparse.Namespace(
+                data_dir=data_dir,
+                output_dir=output_dir,
+                services=["abuseipdb", "alienvault-otx", "ibm-xforce"],
+                abuseipdb_categories="14,15",
+            )
+
+            self.assertEqual(gb.threat_intel_report(args), 0)
+
+            abuse_text = (output_dir / "abuseipdb_manual.json").read_text(
+                encoding="utf-8"
+            )
+            otx_text = (output_dir / "alienvault_otx_manual.json").read_text(
+                encoding="utf-8"
+            )
+            xforce_text = (output_dir / "ibm_xforce_manual.json").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('"does_not_submit_to_abuseipdb": true', abuse_text)
+            self.assertIn('"does_not_submit_to_alienvault_otx": true', otx_text)
+            self.assertIn('"does_not_submit_to_ibm_xforce": true', xforce_text)
+            self.assertIn("9.9.9.9", otx_text)
+            self.assertIn("9.9.9.9", xforce_text)
+
     def test_watch_log_updates_abuseipdb_manual_export_when_new_entries_arrive(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
@@ -258,6 +298,37 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertIn("--apply", service_text)
             self.assertNotIn("police", service_text.lower())
             self.assertNotIn("bank", service_text.lower())
+
+    def test_install_weekly_export_writes_systemd_timer(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            output_dir = Path(temp_dir) / "exports"
+            service_dir = Path(temp_dir) / "systemd-user"
+            timer_dir = Path(temp_dir) / "timers"
+            args = argparse.Namespace(
+                data_dir=data_dir,
+                output_dir=output_dir,
+                services=["abuseipdb", "alienvault-otx", "ibm-xforce"],
+                abuseipdb_categories="14,15",
+                on_calendar="weekly",
+                enable=False,
+                service_dir=service_dir,
+                timer_dir=timer_dir,
+            )
+
+            self.assertEqual(gb.install_weekly_export(args), 0)
+
+            service_text = (
+                service_dir / "guardian-blacklist-weekly-export.service"
+            ).read_text(encoding="utf-8")
+            timer_text = (
+                timer_dir / "guardian-blacklist-weekly-export.timer"
+            ).read_text(encoding="utf-8")
+            self.assertIn("Type=oneshot", service_text)
+            self.assertIn("threat-intel-report", service_text)
+            self.assertIn("--services abuseipdb,alienvault-otx,ibm-xforce", service_text)
+            self.assertIn("OnCalendar=weekly", timer_text)
+            self.assertIn("Persistent=true", timer_text)
 
     def test_firewall_commands_are_local_only(self):
         commands = gb.firewall_commands("8.8.8.8", "Windows")
