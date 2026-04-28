@@ -64,3 +64,50 @@ python3 guardian_blacklist.py install-weekly-export ./weekly_exports --enable
 - レポートは手動確認・手動提出用です。
 - AbuseIPDB、AlienVault OTX、IBM X-Force向けファイルは自動生成できますが、手動提出用でAPI送信は行いません。
 - 常駐監視はローカルログの解析、ポートスキャン/IPスキャン兆候とプロトコル情報の記録、ローカルブラックリスト登録だけを行います。
+
+## Windows LDAC Assistant
+
+Windows 標準 Bluetooth スタックには LDAC エンコーダーが含まれていないため、この補助アプリは独自コーデックの生成、ドライバー改変、OS制限の回避は行いません。代わりに、LDAC 利用可否の診断、暗号化された希望設定の保存、ユーザーログオン時の自動起動登録を行います。
+
+```bash
+python3 windows_ldac_assistant.py status --system Windows
+python3 windows_ldac_assistant.py configure --preferred-bitrate 990 --start-on-login --dry-run
+python3 windows_ldac_assistant.py monitor
+```
+
+Windows では設定を現在の Windows ユーザーに紐づく DPAPI で保護し、`--start-on-login` を指定すると `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に監視コマンドを登録します。実際に登録する場合は Windows 上で `--dry-run` を外して実行してください。
+
+## Audio Lossless Assistant
+
+MP3、AAC、LDAC、SBC などの非可逆コーデックで一度失われた音声情報は、後からどのアプリでも完全復元できません。この補助アプリは「全コーデックをロスレス化」と偽らず、入力コーデックがロスレスか判定し、FLAC、ALAC、WAV/PCM などの実際のロスレス保存先への保全計画を作成します。
+
+```bash
+python3 audio_lossless_assistant.py assess mp3
+python3 audio_lossless_assistant.py assess flac
+python3 audio_lossless_assistant.py plan ldac --target-codec flac
+python3 audio_lossless_assistant.py plan wav --target-codec alac --output ./lossless_plan.json
+```
+
+非可逆コーデックからロスレス形式へ変換する場合、保存できるのは「デコード後に残っている波形」だけです。元ファイルを必ず保持し、出力には `preserved-from-lossy` のように復元ではないことを明記してください。
+
+## AI/NPU Audio Enhancement Assistant
+
+Bluetooth コーデックで劣化した音声に対して、AI と NPU でノイズ低減、帯域拡張、アーティファクト低減の計画を作成できます。ただし、推定補完であり、失われた元サンプルを証明可能なハイレゾロスレスとして復元するものではありません。
+
+```bash
+python3 npu_audio_enhancement_assistant.py status
+python3 npu_audio_enhancement_assistant.py plan ldac --target flac-24-96
+python3 npu_audio_enhancement_assistant.py plan sbc --target wav-24-96 --output ./npu_enhancement_plan.json
+```
+
+ONNX Runtime の NPU 実行プロバイダーが見つかれば NPU 利用計画を表示し、見つからない場合は CPU フォールバックとして表示します。出力には必ず `ai-enhanced-high-res-preservation` のように AI 補完であることを明記してください。
+
+## デスクトップアプリ
+
+Tkinter GUI でロスレス判定、AI/NPU補完計画、Windows LDAC 診断を操作できます。
+
+```bash
+python3 audio_desktop_app.py
+```
+
+Linux デスクトップ環境では `audio-lossless-assistant.desktop` をデスクトップへコピーして、必要に応じて実行権限を付けてください。
