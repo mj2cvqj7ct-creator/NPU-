@@ -123,3 +123,34 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、上記ロードマップのうち「PCM 後処理パイプライン」と
+「NPU 推論バックエンド選択」を検証するための Python プロトタイプを含めています。
+
+- `src/npu_audio_enhancer/dsp.py`: ラウドネス補正、簡易低域/プレゼンス補正、ステレオ幅制御、true peak limiter
+- `src/npu_audio_enhancer/inference.py`: ONNX Runtime QNN Execution Provider、DirectML、CPU の順で使えるバックエンドを選択
+- `src/npu_audio_enhancer/pipeline.py`: Spotify、Apple Music、YouTube Music、汎用プロファイルを持つフレーム処理パイプライン
+- `src/npu_audio_enhancer/wav_io.py`: オフライン検証用 WAV 入出力
+
+QNN/DirectML が使えない開発環境では CPU fallback で同じパイプラインを動かします。
+Snapdragon X 実機では `onnxruntime` の QNN Execution Provider を導入したうえで、
+量子化済み ONNX モデルを `NpuEnhancer` に接続する想定です。
+
+### WAV での試用
+
+```bash
+python3 -m npu_audio_enhancer.cli input.wav output.wav --service spotify
+python3 -m npu_audio_enhancer.cli input.wav output.wav --service apple_music --backend qnn
+python3 -m npu_audio_enhancer.cli input.wav output.wav --service youtube_music --frame-ms 10
+```
+
+入力は mono/stereo の PCM WAV、出力は 24-bit stereo PCM WAV です。
+この CLI は実アプリの音声ストリームや DRM には触れず、ファイル化された PCM の後処理だけを行います。
+
+### テスト
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+```
