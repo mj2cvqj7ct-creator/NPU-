@@ -23,6 +23,7 @@ python3 guardian_blacklist.py scan-log ./security.log --port-scan-threshold 10
 python3 guardian_blacklist.py report ./incident_report.md
 python3 guardian_blacklist.py report ./international_report.md --audience international
 python3 guardian_blacklist.py report ./japan_international_report.md --audience japan-international
+python3 guardian_blacklist.py abuseipdb-report ./abuseipdb_manual.json
 ```
 
 ## Cursorなしで起動時に自動開始する
@@ -51,4 +52,5 @@ python3 guardian_blacklist.py install-autostart ./security.log --threshold 5 --e
 - プライベート、ループバック、予約済み、マルチキャストIPは拒否します。
 - 外部機関への送信や登録は行いません。
 - レポートは手動確認・手動提出用です。
+- AbuseIPDB向けファイルも手動提出用で、API送信は行いません。
 - 常駐監視はローカルログの解析、ポートスキャン/IPスキャン兆候の検知、ローカルブラックリスト登録だけを行います。

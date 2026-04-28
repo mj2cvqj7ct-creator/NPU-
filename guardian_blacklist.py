@@ -9,6 +9,7 @@ party. Reports are generated for the user to review and submit manually.
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import hashlib
 import ipaddress
@@ -34,6 +35,7 @@ PORT_RE = re.compile(
 )
 DEFAULT_SCAN_INTERVAL_SECONDS = 1
 DEFAULT_PORT_SCAN_THRESHOLD = 10
+DEFAULT_ABUSEIPDB_CATEGORIES = "14,15"
 
 
 @dataclass(frozen=True)
@@ -517,6 +519,65 @@ def report(args: argparse.Namespace) -> int:
     return 0
 
 
+def abuseipdb_comment(entry: BlacklistEntry) -> str:
+    return (
+        f"{entry.reason}. Evidence: {entry.evidence}. "
+        f"Source retained locally: {entry.source}. "
+        "Manual review required before submitting to AbuseIPDB."
+    )
+
+
+def abuseipdb_report(args: argparse.Namespace) -> int:
+    entries = BlacklistStore(args.data_dir).load()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    generated_at = utc_now()
+    categories = args.categories
+
+    if args.format == "csv":
+        with args.output.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=["ip", "categories", "comment", "timestamp"],
+            )
+            writer.writeheader()
+            for entry in entries:
+                writer.writerow(
+                    {
+                        "ip": entry.ip,
+                        "categories": categories,
+                        "comment": abuseipdb_comment(entry),
+                        "timestamp": entry.created_at,
+                    }
+                )
+    else:
+        payload = {
+            "generated_at": generated_at,
+            "manual_submission_only": True,
+            "does_not_submit_to_abuseipdb": True,
+            "legal_note": (
+                "Review every entry before submitting through official AbuseIPDB "
+                "channels. This tool does not call the AbuseIPDB API."
+            ),
+            "entries": [
+                {
+                    "ip": entry.ip,
+                    "categories": categories,
+                    "comment": abuseipdb_comment(entry),
+                    "timestamp": entry.created_at,
+                }
+                for entry in entries
+            ],
+        }
+        args.output.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    print(f"wrote AbuseIPDB manual report to {args.output}")
+    print("manual submission only: no AbuseIPDB API call was made")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -595,6 +656,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="tailor manual contact suggestions without submitting anything",
     )
     report_cmd.set_defaults(func=report)
+
+    abuseipdb = subparsers.add_parser(
+        "abuseipdb-report",
+        help="write an AbuseIPDB manual submission file without submitting it",
+    )
+    abuseipdb.add_argument("output", type=Path)
+    abuseipdb.add_argument("--format", choices=["json", "csv"], default="json")
+    abuseipdb.add_argument(
+        "--categories",
+        default=DEFAULT_ABUSEIPDB_CATEGORIES,
+        help="comma-separated AbuseIPDB category IDs to suggest after review",
+    )
+    abuseipdb.set_defaults(func=abuseipdb_report)
     return parser
 
 

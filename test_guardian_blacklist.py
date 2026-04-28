@@ -101,6 +101,37 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertEqual([entry.ip for entry in entries], ["9.9.9.9"])
             self.assertIn("possible port scan", entries[0].evidence)
 
+    def test_abuseipdb_report_is_manual_submission_only(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            store = gb.BlacklistStore(data_dir)
+            self.assertTrue(
+                store.add(
+                    gb.BlacklistEntry(
+                        ip="9.9.9.9",
+                        reason="Port scan detected",
+                        source="firewall.log",
+                        evidence="Observed distinct destination ports",
+                        created_at="2026-04-28T05:00:00+00:00",
+                    )
+                )
+            )
+            report_path = data_dir / "abuseipdb.json"
+            args = argparse.Namespace(
+                data_dir=data_dir,
+                output=report_path,
+                format="json",
+                categories="14,15",
+            )
+
+            self.assertEqual(gb.abuseipdb_report(args), 0)
+
+            report_text = report_path.read_text(encoding="utf-8")
+            self.assertIn('"manual_submission_only": true', report_text)
+            self.assertIn('"does_not_submit_to_abuseipdb": true', report_text)
+            self.assertIn("Manual review required", report_text)
+            self.assertIn("9.9.9.9", report_text)
+
     def test_watch_log_once_scans_without_looping(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
