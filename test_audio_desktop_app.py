@@ -28,6 +28,18 @@ class AudioDesktopAppTest(unittest.TestCase):
         self.assertIn("Native LDAC available: false", text)
         self.assertIn("LDAC", text)
 
+    def test_npu_enhancement_text_marks_output_as_estimated(self):
+        status = app.npu_enhancement.NpuStatus(
+            available=True,
+            provider="QNNExecutionProvider",
+            detail="test provider",
+        )
+        text = app.build_npu_enhancement_text("ldac", "flac-24-96", status=status)
+
+        self.assertIn("Acceleration: NPU via QNNExecutionProvider", text)
+        self.assertIn("True lossless restoration: false", text)
+        self.assertIn("ai-enhanced-high-res-preservation", text)
+
 
 if __name__ == "__main__":
     unittest.main()

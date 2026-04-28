@@ -57,9 +57,21 @@ python3 audio_lossless_assistant.py plan wav --target-codec alac --output ./loss
 
 非可逆コーデックからロスレス形式へ変換する場合、保存できるのは「デコード後に残っている波形」だけです。元ファイルを必ず保持し、出力には `preserved-from-lossy` のように復元ではないことを明記してください。
 
+## AI/NPU Audio Enhancement Assistant
+
+Bluetooth コーデックで劣化した音声に対して、AI と NPU でノイズ低減、帯域拡張、アーティファクト低減の計画を作成できます。ただし、推定補完であり、失われた元サンプルを証明可能なハイレゾロスレスとして復元するものではありません。
+
+```bash
+python3 npu_audio_enhancement_assistant.py status
+python3 npu_audio_enhancement_assistant.py plan ldac --target flac-24-96
+python3 npu_audio_enhancement_assistant.py plan sbc --target wav-24-96 --output ./npu_enhancement_plan.json
+```
+
+ONNX Runtime の NPU 実行プロバイダーが見つかれば NPU 利用計画を表示し、見つからない場合は CPU フォールバックとして表示します。出力には必ず `ai-enhanced-high-res-preservation` のように AI 補完であることを明記してください。
+
 ## デスクトップアプリ
 
-Tkinter GUI でロスレス判定と Windows LDAC 診断を操作できます。
+Tkinter GUI でロスレス判定、AI/NPU補完計画、Windows LDAC 診断を操作できます。
 
 ```bash
 python3 audio_desktop_app.py

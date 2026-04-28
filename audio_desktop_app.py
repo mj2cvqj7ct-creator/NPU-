@@ -19,11 +19,13 @@ if TYPE_CHECKING:
     import tkinter as tk_types
 
 import audio_lossless_assistant as lossless
+import npu_audio_enhancement_assistant as npu_enhancement
 import windows_ldac_assistant as ldac
 
 
 APP_TITLE = "Audio Codec Assistant"
 LOSSLESS_TARGETS = ("flac", "alac", "wav")
+HIGH_RES_TARGETS = ("flac-24-96", "flac-24-192", "wav-24-96", "wav-32-192")
 
 
 def build_lossless_assessment_text(codec: str) -> str:
@@ -44,6 +46,27 @@ def build_ldac_status_text(system: str | None = None) -> str:
     return ldac.render_report(ldac.build_diagnostic(system or platform.system()))
 
 
+def build_npu_enhancement_text(
+    source_codec: str,
+    target: str,
+    status: npu_enhancement.NpuStatus | None = None,
+) -> str:
+    if not source_codec.strip():
+        raise ValueError("source codec is required")
+    plan = npu_enhancement.build_enhancement_plan(
+        source_codec,
+        target=target,
+        npu_status=status,
+    )
+    return npu_enhancement.render_enhancement_plan(plan)
+
+
+def build_npu_status_text(status: npu_enhancement.NpuStatus | None = None) -> str:
+    return npu_enhancement.render_npu_status(
+        status or npu_enhancement.detect_npu_status()
+    )
+
+
 if ttk is not None:
     BaseFrame = ttk.Frame
 else:
@@ -58,6 +81,8 @@ class AudioDesktopApp(BaseFrame):
         self.master = master
         self.source_codec = tk.StringVar(value="mp3")
         self.target_codec = tk.StringVar(value="flac")
+        self.npu_source_codec = tk.StringVar(value="ldac")
+        self.high_res_target = tk.StringVar(value="flac-24-96")
         self.pack(fill=tk.BOTH, expand=True)
         self._build_widgets()
 
@@ -85,11 +110,14 @@ class AudioDesktopApp(BaseFrame):
         notebook.pack(fill=tk.BOTH, expand=True)
 
         lossless_tab = ttk.Frame(notebook, padding=12)
+        npu_tab = ttk.Frame(notebook, padding=12)
         ldac_tab = ttk.Frame(notebook, padding=12)
         notebook.add(lossless_tab, text="ロスレス保全")
+        notebook.add(npu_tab, text="AI/NPU補完")
         notebook.add(ldac_tab, text="Windows LDAC")
 
         self._build_lossless_tab(lossless_tab)
+        self._build_npu_tab(npu_tab)
         self._build_ldac_tab(ldac_tab)
 
     def _build_lossless_tab(self, parent: ttk.Frame) -> None:
@@ -126,6 +154,50 @@ class AudioDesktopApp(BaseFrame):
             "例: flac から alac への計画は真のロスレス保全として表示します。"
         )
 
+    def _build_npu_tab(self, parent: ttk.Frame) -> None:
+        ttk.Label(
+            parent,
+            text=(
+                "AI/NPU は劣化部分を推定補完できますが、"
+                "真のハイレゾロスレス復元ではありません。"
+            ),
+        ).pack(anchor=tk.W)
+
+        form = ttk.Frame(parent)
+        form.pack(fill=tk.X, pady=(10, 0))
+        ttk.Label(form, text="Bluetooth/入力コーデック").grid(
+            row=0, column=0, sticky=tk.W
+        )
+        ttk.Entry(form, textvariable=self.npu_source_codec, width=24).grid(
+            row=0, column=1, sticky=tk.W, padx=(8, 16)
+        )
+
+        ttk.Label(form, text="ハイレゾ保存先").grid(row=0, column=2, sticky=tk.W)
+        ttk.Combobox(
+            form,
+            textvariable=self.high_res_target,
+            values=HIGH_RES_TARGETS,
+            width=14,
+            state="readonly",
+        ).grid(row=0, column=3, sticky=tk.W, padx=(8, 0))
+
+        buttons = ttk.Frame(parent)
+        buttons.pack(fill=tk.X, pady=10)
+        ttk.Button(
+            buttons,
+            text="NPU状態を表示",
+            command=self.show_npu_status,
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            buttons,
+            text="AI補完計画を作成",
+            command=self.show_npu_plan,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
+        self.npu_output = scrolledtext.ScrolledText(parent, wrap=tk.WORD, height=20)
+        self.npu_output.pack(fill=tk.BOTH, expand=True)
+        self._write_npu_output(build_npu_enhancement_text("ldac", "flac-24-96"))
+
     def _build_ldac_tab(self, parent: ttk.Frame) -> None:
         ttk.Label(
             parent,
@@ -151,6 +223,10 @@ class AudioDesktopApp(BaseFrame):
         self.ldac_output.delete("1.0", tk.END)
         self.ldac_output.insert(tk.END, text)
 
+    def _write_npu_output(self, text: str) -> None:
+        self.npu_output.delete("1.0", tk.END)
+        self.npu_output.insert(tk.END, text)
+
     def show_assessment(self) -> None:
         try:
             text = build_lossless_assessment_text(self.source_codec.get())
@@ -171,6 +247,20 @@ class AudioDesktopApp(BaseFrame):
 
     def show_windows_ldac_status(self) -> None:
         self._write_ldac_output(build_ldac_status_text("Windows"))
+
+    def show_npu_status(self) -> None:
+        self._write_npu_output(build_npu_status_text())
+
+    def show_npu_plan(self) -> None:
+        try:
+            text = build_npu_enhancement_text(
+                self.npu_source_codec.get(),
+                self.high_res_target.get(),
+            )
+        except ValueError as exc:
+            messagebox.showerror(APP_TITLE, str(exc))
+            return
+        self._write_npu_output(text)
 
 
 def create_app() -> "tk_types.Tk":
