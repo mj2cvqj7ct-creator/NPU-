@@ -31,6 +31,22 @@ python -m pip install -e .
 
 Linux で GUI を表示する場合は、Qt の xcb/EGL ランタイムライブラリが必要です。
 
+## Cursor デスクトップで起動
+
+Cursor Cloud のデスクトップで直接起動する場合は、次を実行します。
+
+```bash
+bash scripts/linux/run_desktop_app.sh
+```
+
+デスクトップ上にランチャーを作る場合は、次を実行します。
+
+```bash
+bash scripts/linux/install_cursor_desktop_launcher.sh
+```
+
+作成後、デスクトップまたはアプリ一覧の `NPU Streaming Music Enhancer` から起動できます。
+
 ## 実行例
 
 ```bash
