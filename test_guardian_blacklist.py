@@ -81,8 +81,14 @@ class GuardianBlacklistTest(unittest.TestCase):
             log_path = data_dir / "firewall.log"
             log_path.write_text(
                 "\n".join(
-                    f"denied src=9.9.9.9 dpt={port}"
-                    for port in [22, 23, 25, 53, 80]
+                    f"denied src=9.9.9.9 proto={protocol} dpt={port}"
+                    for protocol, port in [
+                        ("TCP", 22),
+                        ("UDP", 23),
+                        ("ICMP", 25),
+                        ("GRE", 53),
+                        ("ESP", 80),
+                    ]
                 )
                 + "\n",
                 encoding="utf-8",
@@ -100,6 +106,7 @@ class GuardianBlacklistTest(unittest.TestCase):
             entries = gb.BlacklistStore(data_dir).load()
             self.assertEqual([entry.ip for entry in entries], ["9.9.9.9"])
             self.assertIn("possible port scan", entries[0].evidence)
+            self.assertIn("observed protocols: ESP, GRE, ICMP, TCP, UDP", entries[0].evidence)
 
     def test_abuseipdb_report_is_manual_submission_only(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -29,7 +29,7 @@ python3 guardian_blacklist.py watch-log ./security.log --abuseipdb-export ./abus
 
 ## Cursorなしで起動時に自動開始する
 
-Linuxでは、OS起動時に常駐監視を開始するsystemd system serviceを生成できます。`--apply` を付けると、新しく見つかった公開IPv4/IPv6をローカルファイアウォールへ適用します。ポートスキャン兆候は、同じIPから観測された異なる宛先ポート数が `--port-scan-threshold` 以上になった場合に記録します。`--abuseipdb-export` を付けると、検知のたびにAbuseIPDB手動提出用ファイルをローカル更新します。
+Linuxでは、OS起動時に常駐監視を開始するsystemd system serviceを生成できます。`--apply` を付けると、新しく見つかった公開IPv4/IPv6をプロトコルを限定せずローカルファイアウォールへ適用します。ポートスキャン兆候は、同じIPから観測された異なる宛先ポート数が `--port-scan-threshold` 以上になった場合に記録します。ログに `proto=TCP` などが含まれる場合は証跡へ残します。`--abuseipdb-export` を付けると、検知のたびにAbuseIPDB手動提出用ファイルをローカル更新します。
 
 ```bash
 sudo python3 guardian_blacklist.py install-boot-service /var/log/security.log --threshold 5 --port-scan-threshold 10 --abuseipdb-export /var/lib/guardian-blacklist/abuseipdb_manual.json --apply --enable
@@ -54,4 +54,4 @@ python3 guardian_blacklist.py install-autostart ./security.log --threshold 5 --e
 - 外部機関への送信や登録は行いません。
 - レポートは手動確認・手動提出用です。
 - AbuseIPDB向けファイルは検知時に自動更新できますが、手動提出用でAPI送信は行いません。
-- 常駐監視はローカルログの解析、ポートスキャン/IPスキャン兆候の検知、ローカルブラックリスト登録だけを行います。
+- 常駐監視はローカルログの解析、ポートスキャン/IPスキャン兆候とプロトコル情報の記録、ローカルブラックリスト登録だけを行います。

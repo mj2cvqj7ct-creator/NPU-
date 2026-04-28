@@ -33,6 +33,10 @@ PORT_RE = re.compile(
     r"\b(?:dpt|dst_port|destination_port|port)\s*[=: ]\s*(\d{1,5})\b",
     re.IGNORECASE,
 )
+PROTOCOL_RE = re.compile(
+    r"\b(?:proto|protocol)\s*[=: ]\s*([A-Za-z0-9_-]{2,16})\b",
+    re.IGNORECASE,
+)
 DEFAULT_SCAN_INTERVAL_SECONDS = 1
 DEFAULT_PORT_SCAN_THRESHOLD = 10
 DEFAULT_ABUSEIPDB_CATEGORIES = "14,15"
@@ -158,6 +162,11 @@ def iter_ports(text: str) -> Iterable[int]:
             yield port
 
 
+def iter_protocols(text: str) -> Iterable[str]:
+    for match in PROTOCOL_RE.finditer(text):
+        yield match.group(1).upper()
+
+
 def scan_log_file(
     data_dir: Path,
     log_file: Path,
@@ -169,8 +178,10 @@ def scan_log_file(
     text = log_file.read_text(encoding="utf-8", errors="replace")
     counts: dict[str, int] = {}
     ports_by_ip: dict[str, set[int]] = {}
+    protocols_by_ip: dict[str, set[str]] = {}
     for line in text.splitlines():
         ports = set(iter_ports(line))
+        protocols = set(iter_protocols(line))
         for candidate in iter_ip_candidates(line):
             try:
                 ip = validate_blockable_ip(candidate)
@@ -179,10 +190,13 @@ def scan_log_file(
             counts[ip] = counts.get(ip, 0) + 1
             if ports:
                 ports_by_ip.setdefault(ip, set()).update(ports)
+            if protocols:
+                protocols_by_ip.setdefault(ip, set()).update(protocols)
 
     added_entries: list[BlacklistEntry] = []
     for ip, count in sorted(counts.items()):
         distinct_ports = ports_by_ip.get(ip, set())
+        protocols = protocols_by_ip.get(ip, set())
         if count < threshold and len(distinct_ports) < port_threshold:
             continue
         evidence_parts = []
@@ -194,6 +208,10 @@ def scan_log_file(
             evidence_parts.append(
                 "possible port scan: "
                 f"{len(distinct_ports)} distinct destination ports observed"
+            )
+        if protocols:
+            evidence_parts.append(
+                "observed protocols: " + ", ".join(sorted(protocols))
             )
         entry = BlacklistEntry(
             ip=ip,
