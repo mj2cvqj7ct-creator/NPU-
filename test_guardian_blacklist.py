@@ -98,7 +98,7 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertIn("ExecStart=", service_text)
             self.assertIn("watch-log", service_text)
             self.assertIn("--data-dir", service_text)
-            self.assertIn("'firewall log.txt'", service_text)
+            self.assertIn(f"'{log_path}'", service_text)
             self.assertNotIn("police", service_text.lower())
             self.assertNotIn("bank", service_text.lower())
 
