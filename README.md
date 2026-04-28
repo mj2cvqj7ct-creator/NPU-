@@ -123,3 +123,25 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、リアルタイム実装へ進む前にアルゴリズムを検証するための
+依存関係なしの Python オフラインプロトタイプを含めています。
+
+```bash
+PYTHONPATH=src python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
+```
+
+主な処理は以下です。
+
+- 16-bit PCM WAV を stereo float に変換
+- RMS ベースのラウドネス正規化
+- ローカル特徴量から NPU 推論相当の補正量を推定する CPU fallback
+- 低域、プレゼンス、エア帯域の保守的な音色補正
+- ステレオ幅制御、トランジェント保護、true peak limiter
+
+`src/snapdragon_npu_audio_enhancer/inference.py` の `QnnOnnxEnhancementModel`
+は、将来の ONNX Runtime QNN Execution Provider 統合ポイントです。Snapdragon X
+実機ではこのクラスに QNN セッション作成、10-20 ms フレーム推論、CPU/DirectML
+fallback の自動切り替えを実装します。
