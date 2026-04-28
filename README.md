@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するためのプロトタイプです。
 
 ## 重要な前提
 
@@ -26,6 +26,48 @@ Music App
   -> NPU Inference
   -> DSP Postprocess
   -> Audio Render Device
+```
+
+## 現在の実装
+
+このリポジトリには、NPU 統合前に音質改善アルゴリズムを検証するための C++17 プロトタイプを含めています。
+
+- `audio_enhancer` library
+  - PCM float の内部バッファ
+  - ラウドネス風 RMS 正規化
+  - 楽曲特徴抽出
+  - ダイナミックな低域/プレゼンス補正
+  - ステレオ幅補正
+  - true peak 風リミッター
+- `audio_enhancer_cli`
+  - 16-bit PCM WAV を読み込み、後処理して WAV として保存
+  - Spotify、Apple Music、YouTube Music などの実ストリーム改変ではなく、OS 出力 PCM 後処理の検証用
+- `src/inference/`
+  - Snapdragon X / QNN NPU、DirectML、CPU fallback を切り替える抽象化層
+  - 現段階では QNN/DirectML は SDK 接続前の shim として動作し、推論モデル接続点を固定しています
+
+```bash
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+WAV ファイルで補正を試す例:
+
+```bash
+./build/audio_enhancer_cli input.wav output.wav --target-lufs -16
+```
+
+Snapdragon X / QNN NPU 経路を優先する検証例:
+
+```bash
+AUDIO_ENHANCER_ENABLE_QNN_NPU=1 ./build/audio_enhancer_cli input.wav output.wav
+```
+
+DirectML shim を使う場合:
+
+```bash
+AUDIO_ENHANCER_ENABLE_DIRECTML=1 ./build/audio_enhancer_cli input.wav output.wav
 ```
 
 ### Audio Capture Layer
