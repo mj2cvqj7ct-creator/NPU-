@@ -31,3 +31,15 @@ python3 guardian_blacklist.py report ./incident_report.md
 - プライベート、ループバック、予約済み、マルチキャストIPは拒否します。
 - 外部機関への送信や登録は行いません。
 - レポートは手動確認・手動提出用です。
+
+## Windows LDAC Assistant
+
+Windows 標準 Bluetooth スタックには LDAC エンコーダーが含まれていないため、この補助アプリは独自コーデックの生成、ドライバー改変、OS制限の回避は行いません。代わりに、LDAC 利用可否の診断、暗号化された希望設定の保存、ユーザーログオン時の自動起動登録を行います。
+
+```bash
+python3 windows_ldac_assistant.py status --system Windows
+python3 windows_ldac_assistant.py configure --preferred-bitrate 990 --start-on-login --dry-run
+python3 windows_ldac_assistant.py monitor
+```
+
+Windows では設定を現在の Windows ユーザーに紐づく DPAPI で保護し、`--start-on-login` を指定すると `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に監視コマンドを登録します。実際に登録する場合は Windows 上で `--dry-run` を外して実行してください。
