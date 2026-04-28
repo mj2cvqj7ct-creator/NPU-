@@ -28,7 +28,7 @@ from typing import Iterable
 APP_NAME = "guardian-blacklist"
 IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 IPV6_RE = re.compile(r"(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f:.%]+")
-DEFAULT_SCAN_INTERVAL_SECONDS = 30
+DEFAULT_SCAN_INTERVAL_SECONDS = 1
 
 
 @dataclass(frozen=True)
@@ -254,6 +254,10 @@ def systemd_user_service_dir() -> Path:
     return Path.home() / ".config" / "systemd" / "user"
 
 
+def systemd_system_service_dir() -> Path:
+    return Path("/etc/systemd/system")
+
+
 def build_watch_command(args: argparse.Namespace) -> list[str]:
     command = [
         sys.executable,
@@ -274,21 +278,19 @@ def build_watch_command(args: argparse.Namespace) -> list[str]:
     return command
 
 
-def install_autostart(args: argparse.Namespace) -> int:
-    if platform.system() != "Linux":
-        print("install-autostart currently writes a Linux systemd user service only")
-        return 2
-
-    service_dir = args.service_dir or systemd_user_service_dir()
-    service_dir.mkdir(parents=True, exist_ok=True)
-    service_path = service_dir / f"{APP_NAME}.service"
-    exec_start = shell_join(build_watch_command(args))
+def write_systemd_service(
+    service_path: Path,
+    exec_start: str,
+    description: str,
+    after: str,
+    wanted_by: str,
+) -> None:
     service_path.write_text(
         "\n".join(
             [
                 "[Unit]",
-                "Description=Guardian Blacklist local log watcher",
-                "After=default.target",
+                f"Description={description}",
+                f"After={after}",
                 "",
                 "[Service]",
                 "Type=simple",
@@ -297,11 +299,34 @@ def install_autostart(args: argparse.Namespace) -> int:
                 "RestartSec=10",
                 "",
                 "[Install]",
-                "WantedBy=default.target",
+                f"WantedBy={wanted_by}",
                 "",
             ]
         ),
         encoding="utf-8",
+    )
+
+
+def ensure_linux(command_name: str, service_type: str) -> bool:
+    if platform.system() != "Linux":
+        print(f"{command_name} currently writes a Linux systemd {service_type} only")
+        return False
+    return True
+
+
+def install_autostart(args: argparse.Namespace) -> int:
+    if not ensure_linux("install-autostart", "user service"):
+        return 2
+
+    service_dir = args.service_dir or systemd_user_service_dir()
+    service_dir.mkdir(parents=True, exist_ok=True)
+    service_path = service_dir / f"{APP_NAME}.service"
+    write_systemd_service(
+        service_path,
+        shell_join(build_watch_command(args)),
+        "Guardian Blacklist local log watcher",
+        "default.target",
+        "default.target",
     )
     print(f"wrote autostart service to {service_path}")
     print("enable with: systemctl --user enable --now guardian-blacklist.service")
@@ -313,6 +338,60 @@ def install_autostart(args: argparse.Namespace) -> int:
             check=True,
         )
     return 0
+
+
+def install_boot_service(args: argparse.Namespace) -> int:
+    if not ensure_linux("install-boot-service", "system service"):
+        return 2
+
+    service_dir = args.service_dir or systemd_system_service_dir()
+    service_dir.mkdir(parents=True, exist_ok=True)
+    service_path = service_dir / f"{APP_NAME}.service"
+    write_systemd_service(
+        service_path,
+        shell_join(build_watch_command(args)),
+        "Guardian Blacklist boot-time local log watcher",
+        "network-online.target",
+        "multi-user.target",
+    )
+    print(f"wrote boot service to {service_path}")
+    print("enable with: sudo systemctl enable --now guardian-blacklist.service")
+
+    if args.enable:
+        prefix = [] if os.geteuid() == 0 else ["sudo"]
+        subprocess.run([*prefix, "systemctl", "daemon-reload"], check=True)
+        subprocess.run(
+            [*prefix, "systemctl", "enable", "--now", f"{APP_NAME}.service"],
+            check=True,
+        )
+    return 0
+
+
+def add_watcher_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("log_file", type=Path)
+    parser.add_argument("--threshold", type=int, default=5)
+    parser.add_argument("--reason", default="Repeated suspicious log activity")
+    parser.add_argument("--interval", type=int, default=DEFAULT_SCAN_INTERVAL_SECONDS)
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="include local firewall application in the watcher",
+    )
+
+
+def add_service_arguments(parser: argparse.ArgumentParser) -> None:
+    add_watcher_arguments(parser)
+    parser.add_argument(
+        "--enable",
+        action="store_true",
+        help="enable and start the service after writing it",
+    )
+    parser.add_argument(
+        "--service-dir",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
 
 
 def evidence_digest(entries: Iterable[BlacklistEntry]) -> str:
@@ -405,16 +484,8 @@ def build_parser() -> argparse.ArgumentParser:
         "watch-log",
         help="run continuously and add public IPs seen repeatedly in a log file",
     )
-    watch.add_argument("log_file", type=Path)
-    watch.add_argument("--threshold", type=int, default=5)
-    watch.add_argument("--reason", default="Repeated suspicious log activity")
-    watch.add_argument("--interval", type=int, default=DEFAULT_SCAN_INTERVAL_SECONDS)
+    add_watcher_arguments(watch)
     watch.add_argument("--system", choices=["Linux", "Darwin", "Windows"], default=None)
-    watch.add_argument(
-        "--apply",
-        action="store_true",
-        help="run local firewall commands for newly added entries",
-    )
     watch.add_argument(
         "--once",
         action="store_true",
@@ -426,27 +497,15 @@ def build_parser() -> argparse.ArgumentParser:
         "install-autostart",
         help="write a startup service that runs watch-log when the user logs in",
     )
-    autostart.add_argument("log_file", type=Path)
-    autostart.add_argument("--threshold", type=int, default=5)
-    autostart.add_argument("--reason", default="Repeated suspicious log activity")
-    autostart.add_argument("--interval", type=int, default=DEFAULT_SCAN_INTERVAL_SECONDS)
-    autostart.add_argument(
-        "--apply",
-        action="store_true",
-        help="include local firewall application in the autostart watcher",
-    )
-    autostart.add_argument(
-        "--enable",
-        action="store_true",
-        help="run systemctl --user enable --now after writing the service",
-    )
-    autostart.add_argument(
-        "--service-dir",
-        type=Path,
-        default=None,
-        help=argparse.SUPPRESS,
-    )
+    add_service_arguments(autostart)
     autostart.set_defaults(func=install_autostart)
+
+    boot_service = subparsers.add_parser(
+        "install-boot-service",
+        help="write a system service that runs watch-log when the OS boots",
+    )
+    add_service_arguments(boot_service)
+    boot_service.set_defaults(func=install_boot_service)
 
     report_cmd = subparsers.add_parser("report", help="write a manual report")
     report_cmd.add_argument("output", type=Path)

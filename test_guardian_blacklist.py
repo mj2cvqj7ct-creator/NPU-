@@ -116,6 +116,34 @@ class GuardianBlacklistTest(unittest.TestCase):
             self.assertNotIn("police", service_text.lower())
             self.assertNotIn("bank", service_text.lower())
 
+    def test_install_boot_service_writes_systemd_system_service(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            service_dir = Path(temp_dir) / "systemd-system"
+            log_path = Path(temp_dir) / "security.log"
+            args = argparse.Namespace(
+                data_dir=data_dir,
+                log_file=log_path,
+                threshold=2,
+                reason="Repeated suspicious log activity",
+                interval=1,
+                apply=True,
+                enable=False,
+                service_dir=service_dir,
+            )
+
+            self.assertEqual(gb.install_boot_service(args), 0)
+
+            service_text = (service_dir / "guardian-blacklist.service").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("After=network-online.target", service_text)
+            self.assertIn("WantedBy=multi-user.target", service_text)
+            self.assertIn("--interval 1", service_text)
+            self.assertIn("--apply", service_text)
+            self.assertNotIn("police", service_text.lower())
+            self.assertNotIn("bank", service_text.lower())
+
     def test_firewall_commands_are_local_only(self):
         commands = gb.firewall_commands("8.8.8.8", "Windows")
         rendered = "\n".join(gb.format_command(command) for command in commands)

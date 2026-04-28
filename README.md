@@ -22,16 +22,21 @@ python3 guardian_blacklist.py watch-log ./security.log --threshold 5
 python3 guardian_blacklist.py report ./incident_report.md
 ```
 
-## 起動時に自動開始する
+## Cursorなしで起動時に自動開始する
 
-Linuxでは、ログイン時に常駐監視を開始するsystemd user serviceを生成できます。
+Linuxでは、OS起動時に常駐監視を開始するsystemd system serviceを生成できます。`--apply` を付けると、新しく見つかった公開IPv4/IPv6をローカルファイアウォールへ適用します。
 
 ```bash
-python3 guardian_blacklist.py install-autostart ./security.log --threshold 5
-systemctl --user enable --now guardian-blacklist.service
+sudo python3 guardian_blacklist.py install-boot-service /var/log/security.log --threshold 5 --apply --enable
 ```
 
-`install-autostart --enable` を指定すると、サービスファイル生成後に `systemctl --user enable --now` まで実行します。実際にローカルファイアウォールへ適用する場合は `--apply` を追加してください。管理者権限やOS側のファイアウォール設定が必要になることがあります。
+ログイン時だけ常駐させたい場合は、systemd user serviceも生成できます。
+
+```bash
+python3 guardian_blacklist.py install-autostart ./security.log --threshold 5 --enable
+```
+
+既定の監視間隔は1秒です。より間隔を空けたい場合は `--interval` を指定してください。管理者権限やOS側のファイアウォール設定が必要になることがあります。
 
 ## 保存先
 
