@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Audio Lossless Assistant
+Comment=Assess codecs and create safe lossless preservation plans
+Exec=python3 /workspace/audio_desktop_app.py
+Terminal=false
+Categories=Audio;Utility;
+StartupNotify=true

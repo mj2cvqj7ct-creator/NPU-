@@ -56,3 +56,13 @@ python3 audio_lossless_assistant.py plan wav --target-codec alac --output ./loss
 ```
 
 非可逆コーデックからロスレス形式へ変換する場合、保存できるのは「デコード後に残っている波形」だけです。元ファイルを必ず保持し、出力には `preserved-from-lossy` のように復元ではないことを明記してください。
+
+## デスクトップアプリ
+
+Tkinter GUI でロスレス判定と Windows LDAC 診断を操作できます。
+
+```bash
+python3 audio_desktop_app.py
+```
+
+Linux デスクトップ環境では `audio-lossless-assistant.desktop` をデスクトップへコピーして、必要に応じて実行権限を付けてください。
