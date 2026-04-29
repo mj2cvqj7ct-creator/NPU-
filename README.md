@@ -123,3 +123,20 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、実機の WASAPI / QNN 統合前にアルゴリズムを検証する Python プロトタイプを含めています。
+
+- 16-bit PCM WAV を読み込み、内部では 48 kHz stereo float 相当の形に正規化します。
+- `NpuFeatureExtractor` は Snapdragon X / QNN 実装の差し込み境界で、現時点では環境変数で backend を選びつつ CPU fallback のスペクトル特徴抽出を実行します。
+- `DspEnhancer` はサービス別プロファイル、ラウドネス補正、簡易 dynamic EQ、soft-knee limiter を適用します。
+- Spotify / Apple Music / YouTube Music のアプリや DRM には触れず、OS 出力後の PCM 後処理だけを対象にします。
+
+```bash
+python -m pip install -e .
+python -m pytest
+npu-audio-enhance input.wav output.wav --service spotify --prefer-npu
+```
+
+Snapdragon X の QNN backend を接続する場合は、`src/npu_audio_enhancer/inference.py` の `NpuFeatureExtractor` を ONNX Runtime QNN Execution Provider の呼び出しに差し替えます。QNN が使えない環境では CPU fallback が同じ特徴量 schema を返すため、DSP とテストはそのまま動作します。
