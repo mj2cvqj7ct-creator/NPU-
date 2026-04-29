@@ -123,3 +123,29 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、実機 NPU 統合の前段として Python の最小パイプラインを追加しています。
+
+- `snapdragon_npu_audio.models`: 48 kHz stereo PCM フレーム、サービス別設定、推論判断のデータモデル
+- `snapdragon_npu_audio.dsp`: ラウドネス正規化、軽量 tilt EQ、ステレオ幅調整、true peak limiter
+- `snapdragon_npu_audio.inference`: Snapdragon X / ARM64 では ONNX Runtime QNN を優先し、DirectML または CPU にフォールバックするバックエンド選択
+- `snapdragon_npu_audio.pipeline`: Spotify、Apple Music、YouTube Music 向けプリセットを使う低遅延処理チェーン
+
+実行例:
+
+```python
+from snapdragon_npu_audio import AudioEnhancementPipeline, AudioFrame, ServiceProfile
+
+pipeline = AudioEnhancementPipeline.for_service(ServiceProfile.SPOTIFY)
+frame = AudioFrame(
+    sample_rate_hz=48_000,
+    channels=2,
+    samples=((0.1, -0.1), (0.12, -0.11), (0.08, -0.09)) * 64,
+)
+result = pipeline.process(frame)
+print(result.backend.kind, result.output_peak)
+```
+
+`SNAPDRAGON_AUDIO_BACKEND=qnn_npu` を指定すると QNN NPU を優先します。QNN が使えない環境では、安全に CPU フォールバックへ戻ります。
