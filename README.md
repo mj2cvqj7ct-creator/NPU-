@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するためのプロトタイプです。
 
 ## 重要な前提
 
@@ -27,6 +27,27 @@ Music App
   -> DSP Postprocess
   -> Audio Render Device
 ```
+
+## 現在のプロトタイプ
+
+このリポジトリには、WASAPI/APO 統合の前段として WAV/PCM フレームに対して動作する Python 実装を含めています。
+
+- 48 kHz / stereo / float PCM を内部基準にした `AudioFrame`
+- EBU R128 近似の短時間ラウドネス正規化
+- 低域、中域、高域の軽量 3 バンド EQ
+- サービス別プリセットによる補正量の切り替え
+- NPU 推論モデル出力を想定した明瞭度、暖かさ、空気感、ステレオ幅の制御
+- true peak limiter による 0 dBFS 超過防止
+- ONNX Runtime の QNN Execution Provider を優先する推論プロバイダ選択
+- WAV 入出力 CLI と自動テスト
+
+### CLI
+
+```bash
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
+```
+
+`--service` は `spotify`、`apple_music`、`youtube_music`、`generic` を指定できます。Snapdragon X / ARM64 Windows で `onnxruntime` と QNN Execution Provider が利用できる場合は NPU を優先し、それ以外では DirectML または CPU fallback を選びます。
 
 ### Audio Capture Layer
 
@@ -93,9 +114,9 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 ## 実装ロードマップ
 
-1. WASAPI loopback の最小プロトタイプを作る。
-2. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。
-3. ルールベースのラウドネス補正、EQ、limiter を追加する。
+1. WAV/PCM で検証できる低遅延 DSP チェーンを実装する。
+2. WASAPI loopback の最小プロトタイプを作る。
+3. 48 kHz stereo のリングバッファとリアルタイム処理スケジューラを実装する。
 4. ONNX Runtime QNN Execution Provider で ARM64 / Snapdragon X NPU 推論を試す。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
