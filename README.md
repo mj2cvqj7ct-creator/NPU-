@@ -101,6 +101,38 @@ Snapdragon X では、以下の順で実装候補を検討します。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
 
+## このリポジトリに含まれるプロトタイプ
+
+現時点では、WASAPI/APO へ組み込む前段階として、WAV ファイルを使ったオフライン検証用の Python パッケージを含みます。
+
+- `src/snapdragon_npu_audio_enhancer/audio_frame.py`: 48 kHz stereo を想定した float32 PCM 表現
+- `src/snapdragon_npu_audio_enhancer/dsp.py`: ラウドネス、帯域エネルギー、ステレオ特徴から制御量を作る DSP
+- `src/snapdragon_npu_audio_enhancer/profiles.py`: Spotify、Apple Music、YouTube Music 向けのローカル後処理プロファイル
+- `src/snapdragon_npu_audio_enhancer/inference.py`: ONNX Runtime QNN / Qualcomm NPU へ差し替えるための推論バックエンド境界
+- `src/snapdragon_npu_audio_enhancer/pipeline.py`: 10 ms から 20 ms 程度のブロック単位で処理する音質改善パイプライン
+
+### 使い方
+
+```bash
+python -m pip install -e ".[test]"
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service apple_music
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service youtube_music
+```
+
+Snapdragon X NPU 用の ONNX モデルを試す場合は、`SNAPDRAGON_NPU_AUDIO_MODEL` にモデルパスを指定します。ONNX Runtime の `QNNExecutionProvider` が使える環境では QNN を優先し、使えない場合は CPU 実行または決定的なヒューリスティック推論に戻します。
+
+```bash
+SNAPDRAGON_NPU_AUDIO_MODEL=enhancer_controls.onnx \
+  python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
+```
+
+NPU モデルが受け取る特徴量と返す制御量の契約は次で出力できます。
+
+```bash
+python -m snapdragon_npu_audio_enhancer.cli --contract model_contract.json
+```
+
 ## 評価指標
 
 - エンドツーエンド遅延: 40 ms 未満を目標
