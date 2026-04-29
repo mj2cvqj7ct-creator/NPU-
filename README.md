@@ -111,3 +111,26 @@ python3 audio_desktop_app.py
 ```
 
 Linux デスクトップ環境では `audio-lossless-assistant.desktop` をデスクトップへコピーして、必要に応じて実行権限を付けてください。
+
+## Snapdragon Streaming Studio
+
+Snapdragon X (ARM64) の NPU を前提に、Spotify / Apple Music / YouTube Music の再生チェーンをリアルタイム最適化するための「実運用向けプラン」を作成できます。音場、定位、奥行き、ボーカル強調、楽器分離、SABAJ A20D(ES) XMOS USB DAC のバッファ設定、オンライン学習型レコメンド更新を 1 つの画面で扱います。
+
+このツールは DRM 回避、サービス内部コーデック改変、ベンダードライバー改造、数学的に完全な原音復元は行いません。代わりに、再生中に適用可能な安全な処理順序・バッファ設計・NPU 実行計画を提供します。
+
+```bash
+python3 snapdragon_streaming_studio.py plan spotify --profile immersive-reference --target-latency-ms 28
+python3 snapdragon_streaming_studio.py plan apple_music --profile vocal-forward --sample-rate 96000
+python3 snapdragon_streaming_studio.py open youtube_music
+python3 snapdragon_streaming_studio.py exe
+```
+
+## Snapdragon Streaming Studio デスクトップUI
+
+モダンな Tkinter UI で、リアルタイム最適化・学習型レコメンド・Windows EXE ビルド手順を操作できます。
+
+```bash
+python3 audio_streaming_studio_app.py
+```
+
+Windows で EXE を作成する場合は、アプリ内の「Windows EXE」タブまたは CLI の `exe` サブコマンドで出力される PyInstaller コマンドを実行してください。生成された `SnapdragonStreamingStudio.exe` をデスクトップへコピーする手順まで表示します。
