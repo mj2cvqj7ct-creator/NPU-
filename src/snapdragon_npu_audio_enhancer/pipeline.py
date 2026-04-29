@@ -7,6 +7,7 @@ import numpy as np
 from .audio_frame import AudioFrame, ensure_stereo
 from .dsp import AudioFeatures, EnhancementControls, FeatureExtractor, RuleBasedEnhancer, merge_controls
 from .inference import InferenceBackend, build_backend
+from .service_profiles import ServiceEnhancementProfile, get_service_profile
 
 
 @dataclass
@@ -16,17 +17,21 @@ class EnhancementPipeline:
     inference_backend: InferenceBackend = field(default_factory=build_backend)
     extractor: FeatureExtractor = field(default_factory=FeatureExtractor)
     enhancer: RuleBasedEnhancer = field(default_factory=RuleBasedEnhancer)
-    npu_mix: float = 0.35
+    service_profile: ServiceEnhancementProfile = field(default_factory=lambda: get_service_profile("neutral"))
 
     last_features: AudioFeatures | None = None
     last_controls: EnhancementControls | None = None
+
+    def __post_init__(self) -> None:
+        self.enhancer.target_rms_db = self.service_profile.target_rms_db
 
     def process_frame(self, frame: AudioFrame) -> AudioFrame:
         frame = ensure_stereo(frame)
         features = self.extractor.extract(frame)
         base_controls = self.enhancer.derive_controls(features)
         inferred_controls = self.inference_backend.infer(features)
-        controls = merge_controls(base_controls, inferred_controls, self.npu_mix)
+        controls = merge_controls(base_controls, inferred_controls, self.service_profile.npu_mix)
+        controls = self.service_profile.tune_controls(controls, features)
 
         self.last_features = features
         self.last_controls = controls

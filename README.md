@@ -129,7 +129,7 @@ Snapdragon X では、以下の順で実装候補を検討します。
 このリポジトリには、上記ロードマップのうちリアルタイム処理コアを検証するための Python プロトタイプを含めています。Spotify、Apple Music、YouTube Music のアプリやストリームには触れず、OS から得られた PCM 音声または WAV ファイルを後処理する設計です。
 
 ```bash
-python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --block-size 960
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify --block-size 960
 ```
 
 主な構成:
@@ -137,7 +137,14 @@ python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --block-size 96
 - `src/snapdragon_npu_audio_enhancer/audio_frame.py`: 48 kHz / stereo / float32 PCM フレーム表現
 - `src/snapdragon_npu_audio_enhancer/dsp.py`: ラウドネス推定、動的 EQ、トランジェント保護、true peak limiter
 - `src/snapdragon_npu_audio_enhancer/inference.py`: ONNX Runtime QNN Execution Provider を優先する NPU 推論バックエンドと CPU ルールベース fallback
+- `src/snapdragon_npu_audio_enhancer/service_profiles.py`: Spotify、Apple Music、YouTube Music ごとのローカル音質補正プロファイル
 - `src/snapdragon_npu_audio_enhancer/pipeline.py`: DSP と推論制御値を統合したフレーム処理パイプライン
 - `src/snapdragon_npu_audio_enhancer/cli.py`: WAV 入出力によるオフライン検証 CLI
+
+サービス別プロファイルは、配信アプリ内部ではなくローカル PCM 後処理の制御値だけを変えます。
+
+- `--service spotify`: 圧縮済みで音圧が高い傾向を前提に、クリップ保護を保ちながらボーカル明瞭度、低域の密度、空気感を控えめに補います。
+- `--service apple-music`: ロスレス/高品位出力を想定し、過度なコンプレッションを避け、ダイナミクスと定位を崩さない補正に寄せます。
+- `--service youtube-music`: ブラウザ/アプリ出力の音量差や高域の荒れを想定し、より保守的な limiter とピーク保護を使います。
 
 Snapdragon X では `--onnx-model enhancer.onnx` を指定し、ONNX Runtime が QNN Execution Provider を利用できる環境で NPU 推論を試します。モデルや QNN が利用できない場合は、CPU の安全なルールベース制御へ自動的に切り替わります。
