@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計と、CPU で検証できるプロトタイプです。
 
 ## 重要な前提
 
@@ -27,6 +27,31 @@ Music App
   -> DSP Postprocess
   -> Audio Render Device
 ```
+
+## ローカル検証 CLI
+
+このブランチには、WAV ファイルでアルゴリズムを検証できる最小 CLI を含めています。実機の Snapdragon X NPU では `src/npu_audio_enhancer/npu.py` の `HeuristicNpuModel` を ONNX Runtime QNN Execution Provider に差し替える想定です。
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+
+python -m npu_audio_enhancer --generate-demo demo_input.wav
+python -m npu_audio_enhancer demo_input.wav demo_spotify.wav --profile spotify-npu
+python -m npu_audio_enhancer demo_input.wav demo_apple.wav --profile apple-music
+python -m npu_audio_enhancer demo_input.wav demo_youtube.wav --profile youtube-music-npu
+```
+
+プロファイルはサービス本体を改変せず、OS から取得した PCM 出力に対してだけ効きます。
+
+| プロファイル | 狙い |
+| --- | --- |
+| `spotify-npu` | 圧縮音源で失われがちな明瞭度とトランジェントを補う |
+| `apple-lossless-npu` | ロスレス再生を前提に、過補正を避けて定位と空気感を整える |
+| `youtube-music-npu` | 動画由来の音量差と粗い高域を滑らかに補正する |
+
+アルゴリズム詳細は `docs/npu_algorithm.md` を参照してください。
 
 ### Audio Capture Layer
 
