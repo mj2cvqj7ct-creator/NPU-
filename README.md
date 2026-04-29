@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモと最小プロトタイプです。
 
 ## 重要な前提
 
@@ -26,6 +26,28 @@ Music App
   -> NPU Inference
   -> DSP Postprocess
   -> Audio Render Device
+```
+
+## 現在のプロトタイプ
+
+このリポジトリには、設計の最初の実装として Python 標準ライブラリだけで動く WAV オフライン処理プロトタイプを含めています。
+
+- `src/snapdragon_npu_audio_enhancer/dsp.py`: DC 除去、チャンネルバランス、ラウドネス寄せ、簡易ダイナミック EQ、ステレオ幅制御、true peak limiter
+- `src/snapdragon_npu_audio_enhancer/service_profiles.py`: Spotify、Apple Music、YouTube Music 向けの安全な後処理プリセット
+- `src/snapdragon_npu_audio_enhancer/inference.py`: ONNX Runtime QNN Execution Provider を検出できる `SnapdragonNpuProvider` と、非 Snapdragon 環境でも動く heuristic fallback
+- `src/snapdragon_npu_audio_enhancer/cli.py`: mono/stereo PCM WAV を読み、サービス別プロファイルと推論プロバイダを使って stereo WAV を出力する CLI
+
+実行例:
+
+```bash
+python3 -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
+python3 -m snapdragon_npu_audio_enhancer.cli --input input.wav --output output.wav --service youtube_music --onnx-model model.onnx
+```
+
+開発用テスト:
+
+```bash
+python3 -m unittest discover -s tests
 ```
 
 ### Audio Capture Layer
