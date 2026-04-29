@@ -85,7 +85,7 @@ class EnhancementPipeline:
         enhanced = TruePeakLimiter(ceiling_dbfs=profile.limiter_ceiling_dbfs).process(enhanced)
 
         return enhanced, EnhancementReport(
-            service=profile.service.value,
+            service=str(profile.service),
             provider=self.provider,
             input_rms_dbfs=frame.rms_dbfs,
             output_rms_dbfs=enhanced.rms_dbfs,
