@@ -43,7 +43,7 @@ def test_unknown_service_is_rejected() -> None:
 
 
 def test_spotify_profile_biases_controls_and_preserves_limiter() -> None:
-    frame = _stereo_tone()
+    frame = _stereo_tone(freq=120.0)
     pipeline = EnhancementPipeline(
         inference_backend=StaticBackend(),
         service_profile=get_service_profile("spotify"),
