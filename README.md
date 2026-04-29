@@ -123,3 +123,24 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、上記ロードマップのうちリアルタイム処理コアを検証するための Python プロトタイプを含めています。Spotify、Apple Music、YouTube Music のアプリやストリームには触れず、OS から得られた PCM 音声または WAV ファイルを後処理する設計です。
+
+```bash
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav \
+  --block-size 960 \
+  --service-profile spotify
+```
+
+主な構成:
+
+- `src/snapdragon_npu_audio_enhancer/audio_frame.py`: 48 kHz / stereo / float32 PCM フレーム表現
+- `src/snapdragon_npu_audio_enhancer/dsp.py`: ラウドネス推定、動的 EQ、トランジェント復元、true peak limiter
+- `src/snapdragon_npu_audio_enhancer/inference.py`: ONNX Runtime QNN Execution Provider を優先する NPU 推論バックエンドと CPU ルールベース fallback
+- `src/snapdragon_npu_audio_enhancer/profiles.py`: Spotify / Apple Music / YouTube Music / Snapdragon X NPU 向けの補正プロファイル
+- `src/snapdragon_npu_audio_enhancer/pipeline.py`: DSP、推論制御値、サービス別プロファイルを統合したフレーム処理パイプライン
+- `src/snapdragon_npu_audio_enhancer/cli.py`: WAV 入出力によるオフライン検証 CLI
+
+`--service-profile` には `auto`, `spotify`, `apple-music`, `youtube-music`, `snapdragon-x-npu` などを指定できます。Snapdragon X では `--onnx-model enhancer.onnx` を指定し、ONNX Runtime が QNN Execution Provider を利用できる環境で NPU 推論を試します。モデルや QNN が利用できない場合は、CPU の安全なルールベース制御へ自動的に切り替わります。

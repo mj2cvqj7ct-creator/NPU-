@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon-npu-audio-enhancer"
+version = "0.1.0"
+description = "Low-latency PCM audio enhancement pipeline with Snapdragon X NPU inference hooks."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+onnx = [
+    "onnxruntime>=1.17",
+]
+test = [
+    "pytest>=8",
+]
+
+[project.scripts]
+npu-audio-enhance = "snapdragon_npu_audio_enhancer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
