@@ -98,7 +98,7 @@ InferenceFeatures = FrameFeatures
 
 
 @dataclass(frozen=True)
-class EnhancementDecision:
+class InferenceDecision:
     bass_boost_db: float
     clarity_boost_db: float
     low_volume_compensation_db: float

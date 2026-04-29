@@ -149,3 +149,9 @@ print(result.backend.kind, result.output_peak)
 ```
 
 `SNAPDRAGON_AUDIO_BACKEND=qnn_npu` を指定すると QNN NPU を優先します。QNN が使えない環境では、安全に CPU フォールバックへ戻ります。
+
+テスト実行:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+```
