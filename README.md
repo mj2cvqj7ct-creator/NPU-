@@ -63,6 +63,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 ## 音質改善パイプライン
 
+詳細なアルゴリズム、NPU 入出力、安全制約、サービス別プロファイルは [`docs/npu_audio_algorithm.md`](docs/npu_audio_algorithm.md) にまとめています。初期チューニング値は [`configs/service_profiles.json`](configs/service_profiles.json) から読み込む想定です。
+
 ### Phase 1: ルールベース補正
 
 - EBU R128 準拠のラウドネス正規化
@@ -100,6 +102,13 @@ Snapdragon X では、以下の順で実装候補を検討します。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
+
+## 初期実装の優先順位
+
+1. 係数ベースの補正モデルを採用し、NPU は EQ、コンプレッション、明瞭度、ステレオ幅の制御値だけを出す。
+2. limiter、ピーク保護、dry/wet clamp は CPU 側 DSP の不変条件として実装する。
+3. Spotify、Apple Music、YouTube Music はプロセス名やセッション名から推定し、判定できない場合は保守的な `generic_streaming` プロファイルを使う。
+4. 個人化はローカルの音質プロファイルに限定し、楽曲推薦やサービス内部ランキングには介入しない。
 
 ## 評価指標
 

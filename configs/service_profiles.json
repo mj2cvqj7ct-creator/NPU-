@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "defaults": {
+    "sample_rate_hz": 48000,
+    "channels": 2,
+    "frame_size_ms": 20,
+    "target_loudness_lufs": -16.0,
+    "max_loudness_gain_db": 6.0,
+    "gain_slew_db_per_second": 1.5,
+    "true_peak_ceiling_dbtp": -1.0,
+    "eq_band_centers_hz": [60, 120, 250, 500, 1500, 3000, 6000, 12000],
+    "max_eq_boost_db": 4.0,
+    "max_eq_cut_db": -4.0,
+    "max_clarity_mix": 0.35,
+    "max_transient_mix": 0.25,
+    "stereo_width_range": [0.85, 1.15]
+  },
+  "services": {
+    "generic_streaming": {
+      "process_hints": [],
+      "loudness_bias_db": 0.0,
+      "eq_safety_scale": 0.75,
+      "clarity_scale": 0.7,
+      "transient_scale": 0.7,
+      "stereo_width_scale": 0.6,
+      "limiter_priority": "balanced",
+      "notes": "Fallback profile for unknown apps. Keep enhancement conservative."
+    },
+    "spotify": {
+      "process_hints": ["Spotify.exe"],
+      "loudness_bias_db": 0.0,
+      "eq_safety_scale": 0.85,
+      "clarity_scale": 0.9,
+      "transient_scale": 0.85,
+      "stereo_width_scale": 0.7,
+      "limiter_priority": "transient_guard",
+      "notes": "Preserve normalized streams while adding modest vocal and transient clarity."
+    },
+    "apple_music": {
+      "process_hints": ["AppleMusic.exe", "Music.UI.exe", "iTunes.exe"],
+      "loudness_bias_db": -0.5,
+      "eq_safety_scale": 0.65,
+      "clarity_scale": 0.6,
+      "transient_scale": 0.55,
+      "stereo_width_scale": 0.45,
+      "limiter_priority": "transparent",
+      "notes": "Prefer low-intrusion processing for lossless-capable playback."
+    },
+    "youtube_music": {
+      "process_hints": ["chrome.exe", "msedge.exe", "YouTubeMusic.exe"],
+      "loudness_bias_db": 0.5,
+      "eq_safety_scale": 0.9,
+      "clarity_scale": 0.85,
+      "transient_scale": 0.75,
+      "stereo_width_scale": 0.6,
+      "limiter_priority": "peak_control",
+      "notes": "React more strongly to loudness inconsistency and uploaded-source variance."
+    }
+  },
+  "npu_runtime": {
+    "preferred_provider_order": ["qnn", "directml", "cpu"],
+    "qnn_target": "snapdragon_x_npu",
+    "model_frame_history": 20,
+    "disable_residual_model_on_fallback": true,
+    "backend_switch_fade_ms": 100
+  },
+  "privacy": {
+    "store_pcm_audio": false,
+    "send_features_to_network": false,
+    "store_track_ids": false,
+    "preference_profile_scope": "local_device_only"
+  }
+}
