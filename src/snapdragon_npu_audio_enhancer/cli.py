@@ -21,7 +21,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--block-size", type=int, default=960, help="Processing block size in PCM frames.")
     parser.add_argument("--model", type=Path, help="Optional ONNX model path for QNN/ONNX Runtime inference.")
-    parser.add_argument("--dump-model-contract", type=Path, help="Write the NPU model feature/control contract and exit.")
+    parser.add_argument(
+        "--contract",
+        "--dump-model-contract",
+        dest="contract",
+        type=Path,
+        help="Write the NPU model feature/control contract and exit.",
+    )
     return parser
 
 
@@ -29,12 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.dump_model_contract:
-        dump_model_contract(args.dump_model_contract)
+    if args.contract:
+        dump_model_contract(args.contract)
         return 0
 
     if args.input is None or args.output is None:
-        parser.error("input and output are required unless --dump-model-contract is used")
+        parser.error("input and output are required unless --contract is used")
 
     frame = read_wav(args.input)
     pipeline = EnhancementPipeline(service=args.service)
