@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Sequence
+from typing import Iterable, Sequence
 
 from .inference import AudioFeatures
 
@@ -132,7 +132,7 @@ def apply_stereo_width(frame: AudioFrame, width: float) -> AudioFrame:
 
 def apply_limiter(frame: AudioFrame, ceiling: float) -> AudioFrame:
     ceiling = _clamp(ceiling, 0.1, 0.999)
-    return _replace_samples(frame, (_soft_limit(sample, ceiling) for sample in frame.samples))
+    return _replace_samples(frame, (_soft_limiter(sample, ceiling) for sample in frame.samples))
 
 
 def update_rms_envelope(previous_rms: float, current_rms_db: float, smoothing: float = 0.1) -> float:
@@ -141,7 +141,7 @@ def update_rms_envelope(previous_rms: float, current_rms_db: float, smoothing: f
     return previous_rms + (current_rms_db - previous_rms) * smoothing
 
 
-def _replace_samples(frame: AudioFrame, samples: Sequence[float] | object) -> AudioFrame:
+def _replace_samples(frame: AudioFrame, samples: Iterable[float]) -> AudioFrame:
     return AudioFrame(tuple(float(sample) for sample in samples), frame.sample_rate, frame.channels)
 
 
@@ -206,8 +206,7 @@ def _soft_limiter(sample: float, ceiling: float) -> float:
     if abs(sample) <= ceiling:
         return sample
     sign = 1.0 if sample >= 0.0 else -1.0
-    excess = abs(sample) - ceiling
-    return sign * min(1.0, ceiling + math.tanh(excess) * (1.0 - ceiling))
+    return sign * ceiling
 
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:
