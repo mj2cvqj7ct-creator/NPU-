@@ -1,6 +1,8 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモ兼プロトタイプです。
+
+このリポジトリの初期実装は、WAV/PCM を対象にした低遅延 DSP パイプラインです。実際の音楽サービスのアプリや暗号化されたストリームには触れず、将来の WASAPI loopback / APO / 仮想オーディオデバイス統合で得られる PCM フレームを処理する前提で作っています。
 
 ## 重要な前提
 
@@ -69,6 +71,7 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - ヘッドホン別 EQ プロファイル
 - true peak limiter
 - 曲間音量差の低減
+- 現在のプロトタイプでは、短時間 RMS に基づく自動ゲイン、3 バンドの固定 EQ、ソフトリミッターを実装しています。
 
 ### Phase 2: NPU 支援の補正
 
@@ -100,6 +103,38 @@ Snapdragon X では、以下の順で実装候補を検討します。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
+
+## 現在のプロトタイプ
+
+```text
+src/snapdragon_audio_enhancer/
+  audio.py       WAV 読み書きと float32 PCM 変換
+  dsp.py         自動ゲイン、簡易 3 バンド EQ、ソフトリミッター
+  inference.py   NPU / ONNX / CPU 推論バックエンド抽象
+  pipeline.py    フレーム単位の処理オーケストレーション
+  cli.py         WAV 入出力での検証用 CLI
+tests/           DSP とパイプラインの自動テスト
+```
+
+### 実行例
+
+```bash
+python -m snapdragon_audio_enhancer.cli input.wav output.wav
+```
+
+または、パッケージとしてインストールした場合:
+
+```bash
+snapdragon-audio-enhance input.wav output.wav --frame-ms 10 --backend cpu
+```
+
+`--backend qnn` または `--backend onnx-qnn` は、Snapdragon X 実機で Qualcomm AI Engine Direct SDK / ONNX Runtime QNN Execution Provider を接続するための予約済みインターフェースです。現時点では、未接続のバックエンドを選んだ場合でも安全に CPU パスへフォールバックします。
+
+### テスト
+
+```bash
+python -m pytest
+```
 
 ## 評価指標
 
