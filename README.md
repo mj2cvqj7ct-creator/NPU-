@@ -23,6 +23,7 @@ python -m snapdragon_npu_audio.cli input.wav output.wav --service spotify --inte
 python -m snapdragon_npu_audio.cli input.wav output.wav --service apple_music
 python -m snapdragon_npu_audio.cli input.wav output.wav --service youtube_music --model model.onnx
 python -m snapdragon_npu_audio.cli input.wav output.wav --list-backends
+python3 -m unittest discover -s tests
 ```
 
 Snapdragon X / ARM64 Windows 上で `onnxruntime` と QNN Execution Provider が利用可能で、`--model` に量子化済み ONNX モデルを指定した場合は QNN を優先します。利用できない環境では DirectML、最後に CPU fallback を使い、同じ DSP チェーンを安全に検証できます。

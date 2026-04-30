@@ -159,7 +159,7 @@ class TruePeakLimiter:
             if target_gain < self._gain:
                 self._gain = target_gain
             else:
-                self._gain += (1.0 - self._gain) * self.release
+                self._gain = min(target_gain, self._gain + (1.0 - self._gain) * self.release)
             limited.append((clamp_sample(left * self._gain), clamp_sample(right * self._gain)))
         return frame.with_samples(limited)
 

@@ -75,7 +75,7 @@ class CpuFeatureBackend:
         abs_samples = [abs(sample) for sample in mono]
         peak = max(abs_samples)
         mean_abs = sum(abs_samples) / len(abs_samples)
-        rms = frame.rms()
+        rms = frame.rms
         crest_factor = peak / max(rms, 1e-6)
 
         low_energy = _band_energy_proxy(mono, window=32)
