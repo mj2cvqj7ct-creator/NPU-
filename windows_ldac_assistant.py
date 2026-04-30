@@ -126,10 +126,18 @@ class LdacSettings:
 
 
 @dataclass(frozen=True)
+class ExclusiveModeStatus:
+    supported: bool
+    active: bool
+    detail: str
+
+
+@dataclass(frozen=True)
 class DiagnosticReport:
     os_name: str
     native_ldac_available: bool
     safe_to_force_codec: bool
+    exclusive_mode: ExclusiveModeStatus
     message: str
     recommendations: list[str]
 
@@ -167,19 +175,68 @@ class SettingsStore:
         return LdacSettings(**data)
 
 
+def detect_exclusive_mode(system: str | None = None) -> ExclusiveModeStatus:
+    """Detect WASAPI exclusive mode availability.
+
+    On Windows this inspects the registry for the audio endpoint policy.
+    On other platforms, exclusive mode is not applicable.
+    """
+    os_name = (system or platform.system()).lower()
+    if os_name != "windows":
+        return ExclusiveModeStatus(
+            supported=False,
+            active=False,
+            detail="WASAPI排他モードはWindowsのみ対応です。",
+        )
+    try:
+        import winreg
+
+        key_path = (
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
+        )
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as _key:
+            return ExclusiveModeStatus(
+                supported=True,
+                active=False,
+                detail=(
+                    "WASAPI排他モード対応デバイスが存在します。"
+                    "デバイスのプロパティで排他モードが許可されているか確認してください。"
+                ),
+            )
+    except Exception:
+        return ExclusiveModeStatus(
+            supported=True,
+            active=False,
+            detail=(
+                "WASAPI排他モードはWindows環境で利用可能ですが、"
+                "現在のデバイス状態を確認できませんでした。"
+                "サウンド設定 → デバイスのプロパティ → 詳細 → "
+                "排他モードを確認してください。"
+            ),
+        )
+
+
 def build_diagnostic(system: str | None = None) -> DiagnosticReport:
     os_name = system or platform.system()
     is_windows = os_name.lower() == "windows"
+    exclusive = detect_exclusive_mode(os_name)
     recommendations = [
         "LDAC対応ヘッドホン/スピーカー側で LDAC を有効にしてください。",
         "PC側はLDAC対応のBluetoothドライバーまたはメーカー提供ソフトの有無を確認してください。",
         "このアプリは独自コーデック生成やドライバー改変を行いません。",
     ]
+    if is_windows:
+        recommendations.append(
+            "サウンド設定 → デバイスのプロパティ → 詳細タブで"
+            "「アプリケーションによりこのデバイスを排他的に制御できるようにする」"
+            "を有効にしてください。"
+        )
     if not is_windows:
         return DiagnosticReport(
             os_name=os_name,
             native_ldac_available=False,
             safe_to_force_codec=False,
+            exclusive_mode=exclusive,
             message="この補助アプリは Windows の Bluetooth 制約確認向けです。",
             recommendations=recommendations,
         )
@@ -187,6 +244,7 @@ def build_diagnostic(system: str | None = None) -> DiagnosticReport:
         os_name=os_name,
         native_ldac_available=False,
         safe_to_force_codec=False,
+        exclusive_mode=exclusive,
         message="Windows 標準 Bluetooth スタックには LDAC エンコーダーが含まれていません。",
         recommendations=recommendations,
     )
@@ -195,10 +253,13 @@ def build_diagnostic(system: str | None = None) -> DiagnosticReport:
 def render_report(report: DiagnosticReport) -> str:
     lines = [
         f"OS: {report.os_name}",
-        f"Native LDAC available: {str(report.native_ldac_available).lower()}",
-        f"Safe to force codec: {str(report.safe_to_force_codec).lower()}",
+        f"ネイティブLDAC対応: {'あり' if report.native_ldac_available else 'なし'}",
+        f"コーデック強制変更: {'安全' if report.safe_to_force_codec else '非推奨'}",
+        f"WASAPI排他モード対応: {'あり' if report.exclusive_mode.supported else 'なし'}",
+        f"WASAPI排他モード状態: {'有効' if report.exclusive_mode.active else '未確認'}",
+        f"排他モード詳細: {report.exclusive_mode.detail}",
         report.message,
-        "Recommendations:",
+        "推奨事項:",
     ]
     lines.extend(f"- {item}" for item in report.recommendations)
     return "\n".join(lines)
