@@ -116,10 +116,26 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - Spotify、Apple Music、YouTube Music の推薦ランキングやアプリ内部ロジックの改変
 - すべての音源を無条件に派手に加工すること
 
+## 実装済みプロトタイプ
+
+- `src/snapdragon_npu_audio/dsp.py`: ラウドネス補正、動的 EQ、ステレオ幅補正、true peak limiter を含む低遅延 DSP チェーン
+- `src/snapdragon_npu_audio/inference.py`: Qualcomm QNN、DirectML、CPU fallback の実行プロバイダ選択と、NPU モデル差し替え用の推論境界
+- `src/snapdragon_npu_audio/profiles.py`: Spotify、Apple Music、YouTube Music、汎用ストリーミング向けのサービス別補正プロファイル
+- `src/snapdragon_npu_audio/cli.py`: 16-bit PCM WAV をオフライン処理してパイプラインを検証する CLI
+- `profiles/streaming-default.json`: 外部調整用のクロスサービス標準プロファイル
+- `tests/`: DSP、推論プロバイダ選択、プロファイル解決の自動テスト
+
+CLI の例:
+
+```bash
+python -m snapdragon_npu_audio.cli input.wav output.wav --provider-report
+```
+
+`SNAPDRAGON_AUDIO_PROVIDERS=QNNExecutionProvider` を設定すると、Snapdragon X NPU 向け QNN 実行プロバイダが検出された場合の経路を確認できます。
+
 ## 次に作るもの
 
-- `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
-- `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- `src/audio_capture/`: Windows ARM64 の WASAPI loopback capture
+- ONNX Runtime QNN Execution Provider で実モデルをロードする `EnhancementModel` 実装
+- APO または仮想オーディオデバイス化によるシステムワイド常用化
+- 個人化プロファイルの暗号化保存と UI

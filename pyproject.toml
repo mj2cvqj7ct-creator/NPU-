@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon-npu-audio"
+version = "0.1.0"
+description = "Prototype DSP and NPU-provider foundation for Snapdragon X system-wide music enhancement."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Cursor Automation" }]
+
+[project.scripts]
+snapdragon-npu-audio = "snapdragon_npu_audio.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+snapdragon_npu_audio = ["py.typed"]

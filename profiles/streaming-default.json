@@ -1,0 +1,14 @@
+{
+  "name": "streaming-default",
+  "description": "Balanced cross-service profile for Spotify, Apple Music, and YouTube Music playback.",
+  "target_lufs": -16.0,
+  "max_gain_db": 6.0,
+  "limiter_ceiling_db": -1.0,
+  "bass_gain_db": 1.2,
+  "presence_gain_db": 1.0,
+  "air_db": 0.8,
+  "stereo_width": 1.08,
+  "transient_restore": 0.18,
+  "vocal_clarity": 0.22,
+  "low_volume_compensation": 0.15
+}
