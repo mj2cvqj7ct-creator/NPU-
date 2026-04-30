@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための実験的な音声処理コアです。
 
 ## 重要な前提
 
@@ -27,6 +27,32 @@ Music App
   -> DSP Postprocess
   -> Audio Render Device
 ```
+
+## 現在の実装
+
+このリポジトリには、WASAPI/APO 統合の前段階としてテスト可能な Python 実装を追加しています。
+
+- `src/npu_audio_enhancer/frame.py`: 48 kHz stereo float フレーム表現
+- `src/npu_audio_enhancer/dsp.py`: ラウドネス推定、簡易特徴抽出、EQ 風トーン補正、ステレオ幅、true peak limiter
+- `src/npu_audio_enhancer/inference.py`: Snapdragon X / QNN 優先の推論バックエンド選択と CPU fallback
+- `src/npu_audio_enhancer/profiles.py`: Spotify、Apple Music、YouTube Music、汎用プロファイル
+- `src/npu_audio_enhancer/pipeline.py`: サービス別プロファイルと推論結果を組み合わせる低遅延フレーム処理パイプライン
+
+### 最小使用例
+
+```python
+from npu_audio_enhancer import AudioEnhancementPipeline, AudioFrame, MusicService
+
+frame = AudioFrame.from_interleaved((0.1, 0.1, -0.1, -0.1))
+pipeline = AudioEnhancementPipeline(service=MusicService.SPOTIFY)
+result = pipeline.process(frame)
+
+print(result.backend)
+print(result.metrics.true_peak)
+processed_interleaved = result.frame.to_interleaved()
+```
+
+`SNAPDRAGON_AUDIO_BACKEND=qnn`、`directml`、`cpu` を指定するとバックエンド選択を強制できます。実機で ONNX Runtime QNN Execution Provider とモデルを接続するまでは、QNN/DirectML アダプタも同じ推論契約を満たすヒューリスティック処理を返します。
 
 ### Audio Capture Layer
 

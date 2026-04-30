@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon-x-npu-audio-enhancer"
+version = "0.1.0"
+description = "Low-latency audio enhancement core for Snapdragon X NPU assisted music playback."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Cursor Automation" }]
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
