@@ -104,7 +104,7 @@ ONNX Runtime の NPU 実行プロバイダーが見つかれば NPU 利用計画
 
 ## デスクトップアプリ
 
-Tkinter GUI でロスレス判定、AI/NPU補完計画、Windows LDAC 診断を操作できます。
+Tkinter GUI でロスレス判定、AI/NPU補完計画、Windows LDAC 診断、Snapdragon X Streaming Studio（3サービス向け空間音響/NPU/XMOS/レコメンド更新）を操作できます。
 
 ```bash
 python3 audio_desktop_app.py
