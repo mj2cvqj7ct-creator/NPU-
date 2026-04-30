@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon-audio-enhancer"
+version = "0.1.0"
+description = "Local audio enhancement prototype for Snapdragon X NPU assisted music playback."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Cursor Automation" }]
+license = { text = "Proprietary" }
+keywords = ["audio", "snapdragon", "npu", "dsp", "wasapi"]
+
+[project.scripts]
+snapdragon-audio-enhance = "snapdragon_audio_enhancer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

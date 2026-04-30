@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するためのプロトタイプです。
 
 ## 重要な前提
 
@@ -8,6 +8,27 @@ ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube
 - 実装対象は、各アプリから OS に出力された PCM 音声を取得し、低遅延で補正して再生デバイスへ戻す「システムワイド音声エンハンサー」です。
 - Snapdragon X の NPU は、ニューラル音声補正、軽量超解像、楽曲特徴抽出、ユーザー嗜好推定などの推論処理に使います。
 - DRM、各サービスの利用規約、プライバシーを尊重し、録音保存やストリームの再配布は行いません。
+
+## 現在の実装
+
+このリポジトリには、実機 WASAPI / APO 統合前に音質補正の安全性を検証するための WAV ベースの最小パイプラインが入っています。
+
+- `src/snapdragon_audio_enhancer/audio_types.py`: 48 kHz stereo を想定した float PCM フレーム型
+- `src/snapdragon_audio_enhancer/dsp.py`: ラウドネス正規化、簡易ダイナミック EQ、stereo width、true peak limiter
+- `src/snapdragon_audio_enhancer/inference.py`: Snapdragon X NPU / ONNX Runtime QNN EP を優先する推論プロバイダ抽象化と CPU fallback
+- `src/snapdragon_audio_enhancer/profile.py`: Spotify、Apple Music、YouTube Music、汎用の補正プリセット
+- `src/snapdragon_audio_enhancer/cli.py`: 16-bit PCM stereo WAV を補正する CLI
+- `tests/`: DSP、推論 fallback、CLI の自動テスト
+
+### 試し方
+
+```bash
+python -m pip install -e .
+python -m pytest
+snapdragon-audio-enhance input.wav output.wav --service spotify --report-json report.json
+```
+
+NPU 統合が未設定の環境では、自動的に deterministic な CPU fallback を使います。NPU を明示的に無効化する場合は `--no-npu` または `SNAPDRAGON_AUDIO_FORCE_CPU=1` を使います。
 
 ## 目標
 
@@ -53,6 +74,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 推論モデルは小型化し、10 ms から 20 ms 程度のフレーム単位で動作させます。
 
+現行コードでは `InferenceProvider` インターフェースを用意し、Windows ARM64 かつ ONNX Runtime が利用可能な場合に QNN 経路を選択できる構成にしています。モデルファイルと実機 QNN 設定が入るまでは、同じ制御値インターフェースを CPU heuristic が返します。
+
 ### DSP Postprocess
 
 - ダイナミック EQ
@@ -93,9 +116,9 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 ## 実装ロードマップ
 
-1. WASAPI loopback の最小プロトタイプを作る。
-2. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。
-3. ルールベースのラウドネス補正、EQ、limiter を追加する。
+1. WAV ベースの DSP / 推論制御プロトタイプを作る。完了
+2. WASAPI loopback の最小プロトタイプを作る。
+3. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。
 4. ONNX Runtime QNN Execution Provider で ARM64 / Snapdragon X NPU 推論を試す。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
@@ -118,8 +141,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 ## 次に作るもの
 
-- `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
-- `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- Windows ARM64 の `src/audio_capture/`: WASAPI loopback capture
+- 低遅延リングバッファとドロップアウト検出
+- 実モデルを使う ONNX Runtime QNN integration
+- 暗号化されたローカル個人化プロファイル
+- ヘッドホン別 EQ 測定データと AB テスト用評価ツール
