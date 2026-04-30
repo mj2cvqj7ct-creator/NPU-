@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモ兼プロトタイプです。
 
 ## 重要な前提
 
@@ -87,9 +87,40 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 | サービス | 直接改変 | 実現可能な改善 |
 | --- | --- | --- |
-| Spotify | 不可 | OS 出力音声のリアルタイム補正、ローカル嗜好プロファイル |
-| Apple Music | 不可 | ロスレス出力への後処理、ヘッドホン別補正 |
-| YouTube Music | 不可 | ブラウザまたはアプリ出力の後処理、音量差補正 |
+| Spotify | 不可 | OS 出力音声のリアルタイム補正、圧縮済み音源を過補正しない明瞭度補正 |
+| Apple Music | 不可 | ロスレス出力のダイナミクスを残す控えめな後処理、ヘッドホン別補正 |
+| YouTube Music | 不可 | ブラウザまたはアプリ出力の後処理、音量差補正、高域の粗さ抑制 |
+
+プロトタイプでは `--service spotify`、`--service apple-music`、`--service youtube-music` で各サービス向けのローカル DSP バイアスを選びます。これはアプリ内部、DRM、推薦ランキングを変更するものではなく、OS に出た PCM 音声に対する後処理だけです。
+
+## 現在のプロトタイプ
+
+このリポジトリには、WASAPI loopback で取得する予定の 48 kHz stereo float PCM と同じ前提で動く Python プロトタイプを含めています。
+
+- `src/snapdragon_npu_audio_enhancer/audio_frame.py`: PCM フレーム表現と dBFS ユーティリティ
+- `src/snapdragon_npu_audio_enhancer/dsp.py`: 短時間特徴抽出、ラウドネス/EQ/コンプレッサ/limiter
+- `src/snapdragon_npu_audio_enhancer/inference.py`: ONNX Runtime QNN、DirectML、CPU fallback の推論バックエンド
+- `src/snapdragon_npu_audio_enhancer/service_profiles.py`: Spotify、Apple Music、YouTube Music 向けの安全な出力段チューニング
+- `src/snapdragon_npu_audio_enhancer/pipeline.py`: 10-20 ms ブロックを想定した低遅延処理チェーン
+- `src/snapdragon_npu_audio_enhancer/wav_io.py`: WAV 入出力によるオフライン検証
+
+### ローカルで試す
+
+```bash
+python -m pip install -e ".[test]"
+python -m pytest
+npu-audio-enhance input.wav output.wav --service spotify
+```
+
+`--target-lufs` を指定すると、サービス別プロファイルの標準値より優先されます。
+
+ONNX モデルを用意した場合は、Snapdragon X では QNN Execution Provider を優先し、利用できない環境では CPU fallback に戻します。
+
+```bash
+npu-audio-enhance input.wav output.wav \
+  --service apple-music \
+  --onnx-model models/enhancement_controls.onnx
+```
 
 ## 実装ロードマップ
 
@@ -119,7 +150,6 @@ Snapdragon X では、以下の順で実装候補を検討します。
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- ARM64 Windows 実機で ONNX Runtime QNN Execution Provider の provider availability とレイテンシを測定
+- APO 化または仮想オーディオデバイス化して常用できる形にする
