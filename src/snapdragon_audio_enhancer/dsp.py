@@ -79,7 +79,7 @@ class EnhancementSettings:
         clarity = float(getattr(tuning, "presence_gain_db", 0.0))
         warmth = float(getattr(tuning, "warmth_gain_db", 0.0))
         air = float(getattr(tuning, "air_gain_db", 0.0))
-        transient = float(getattr(tuning, "transient_boost", 0.0))
+        transient = float(getattr(tuning, "transient_restore", 0.0))
         width = float(getattr(tuning, "stereo_width", profile.stereo_width))
         return cls(
             target_lufs=profile.target_lufs,

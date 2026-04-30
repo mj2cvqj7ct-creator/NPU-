@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモ兼プロトタイプです。
 
 ## 重要な前提
 
@@ -27,6 +27,41 @@ Music App
   -> DSP Postprocess
   -> Audio Render Device
 ```
+
+## 現在のプロトタイプ
+
+このリポジトリには、将来の WASAPI/APO 実装へ移植しやすい純 Python のオフライン検証基盤を追加しています。
+
+- `src/snapdragon_audio_enhancer/dsp.py`: 48 kHz stereo float PCM 向けのラウドネス補正、簡易トーンカーブ、トランジェント補正、ステレオ幅制御、true peak limiter
+- `src/snapdragon_audio_enhancer/inference.py`: ONNX Runtime QNN、DirectML、CPU fallback のプロバイダ選択と、音声特徴量から安全な補正量を決める NPU 推論ポリシー層
+- `src/snapdragon_audio_enhancer/profiles.py`: Spotify、Apple Music、YouTube Music、Generic のサービス別プロファイル
+- `src/snapdragon_audio_enhancer/pipeline.py`: サービスプロファイル、推論ポリシー、DSP を束ねる低遅延フレーム処理パイプライン
+- `src/snapdragon_audio_enhancer/cli.py`: 16-bit stereo WAV を入力にしたオフライン検証 CLI
+
+実機の Snapdragon X / ARM64 Windows では、`onnxruntime` が `QNNExecutionProvider` を提供している場合に QNN を優先します。未対応環境では DirectML、最後に CPU fallback を選び、同じ DSP 安全制約を維持します。
+
+### CLI での試験
+
+```bash
+python3 -m pip install -e .
+python3 -m snapdragon_audio_enhancer.cli input.wav output.wav --service spotify --provider auto
+```
+
+テストを実行する場合:
+
+```bash
+python3 -m pip install -e ".[test]"
+python3 -m pytest
+```
+
+対応するサービス指定:
+
+- `spotify`
+- `apple_music`
+- `youtube_music`
+- `generic`
+
+入力は 16-bit PCM stereo WAV を想定します。実時間キャプチャはまだ含めず、WASAPI loopback や APO へ統合する前の音質・安全性検証に使います。
 
 ### Audio Capture Layer
 

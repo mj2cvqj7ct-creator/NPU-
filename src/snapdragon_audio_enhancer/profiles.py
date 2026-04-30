@@ -106,8 +106,11 @@ def get_service_profile(service: str | ServiceName | None) -> ServiceProfile:
         "you_tube_music": ServiceName.YOUTUBE_MUSIC,
         "spotify": ServiceName.SPOTIFY,
     }
-    try:
-        key = aliases.get(normalized, ServiceName(normalized))
-    except ValueError:
-        key = ServiceName.GENERIC
+    if normalized in aliases:
+        key = aliases[normalized]
+    else:
+        try:
+            key = ServiceName(normalized)
+        except ValueError:
+            key = ServiceName.GENERIC
     return SERVICE_PROFILES[key]
