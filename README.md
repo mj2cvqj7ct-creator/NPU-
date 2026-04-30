@@ -123,3 +123,53 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、Windows 固有の WASAPI / APO 実装に入る前段階として、
+Linux CI でも検証できるポータブルな C++17 DSP コアを追加しています。
+
+実装済みの範囲:
+
+- `src/dsp/`
+  - 48 kHz stereo を想定した `AudioFrame`
+  - 短時間 RMS / peak / crest factor / stereo correlation の解析
+  - low shelf、presence、air band 用の stereo biquad EQ
+  - 小音量再生向けの控えめな makeup gain
+  - soft knee 風の軽量コンプレッション
+  - mid/side stereo width 制御
+  - -1 dBFS ceiling の true peak safety limiter
+- `src/inference/`
+  - `Qualcomm QNN SDK`、`ONNX Runtime QNN EP`、`DirectML`、`CPU fallback` を切り替えるためのバックエンド抽象
+  - 現時点ではテスト可能な CPU fallback ヒューリスティックを実装
+  - ARM64 Windows では QNN / DirectML を優先できる構造
+- `src/profile/`
+  - clarity、warmth、stereo、low-volume、late-night などのローカル嗜好プロファイル
+- `tests/`
+  - limiter、quiet playback lift、stereo width bound、backend fallback の自動テスト
+
+### ビルドとテスト
+
+```bash
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+### Snapdragon X NPU への接続方針
+
+現在の `EnhancementModel` は CPU fallback で同じ制御信号を生成します。次の段階では
+このクラスの内部を ONNX Runtime QNN Execution Provider または Qualcomm QNN SDK に差し替え、
+`AudioMetrics` と短時間スペクトル特徴を入力として以下の制御値を NPU から返す構成にします。
+
+- vocal presence
+- bass tightness
+- air band
+- transient restore
+- stereo width
+- compression ratio
+- low-volume makeup gain
+- wet mix
+
+これにより Spotify、Apple Music、YouTube Music のアプリや DRM には触れず、OS に出力された
+PCM 音声に対するローカルな後処理として NPU 支援の音質改善を実現します。
