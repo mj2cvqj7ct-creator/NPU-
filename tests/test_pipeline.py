@@ -1,5 +1,9 @@
 import math
+import sys
 import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from npu_audio_enhancer import AudioEnhancementPipeline, AudioFrame, MusicService
 from npu_audio_enhancer.dsp import analyze_frame
