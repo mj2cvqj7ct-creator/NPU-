@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon-npu-audio-enhancer"
+version = "0.1.0"
+description = "Service-agnostic PCM audio enhancement pipeline for Snapdragon X NPU experiments."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Cursor Automation" }
+]
+license = { text = "Proprietary" }
+
+[project.scripts]
+npu-audio-enhance = "npu_audio_enhancer.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

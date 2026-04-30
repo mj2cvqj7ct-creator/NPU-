@@ -116,6 +116,32 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - Spotify、Apple Music、YouTube Music の推薦ランキングやアプリ内部ロジックの改変
 - すべての音源を無条件に派手に加工すること
 
+## Python プロトタイプ
+
+このリポジトリには、WASAPI / APO 統合へ進む前にアルゴリズムを検証するための
+サービス非依存 PCM 後処理プロトタイプを含めています。Spotify、Apple Music、
+YouTube Music などのアプリ内部には触れず、WAV または将来の loopback capture
+から得た PCM フレームに対して同じ処理を適用します。
+
+主な構成:
+
+- `npu_audio_enhancer.audio_frame`: 48 kHz / float PCM を想定した短時間フレーム表現
+- `npu_audio_enhancer.dsp`: ラウドネス補正、動的 EQ、ステレオ幅補正、true peak limiter
+- `npu_audio_enhancer.inference`: QNN -> DirectML -> CPU fallback の推論プロバイダ選択
+- `npu_audio_enhancer.pipeline`: DSP と推論ヒントを結合する低遅延処理パイプライン
+- `npu_audio_enhancer.wav_io`: WAV 入出力と 10-20 ms フレーム分割
+
+### CLI での検証
+
+```bash
+python -m npu_audio_enhancer.cli input.wav output.wav --frame-ms 20
+```
+
+ONNX モデルを用意した環境では、`--model model.onnx` を指定します。
+`NPU_AUDIO_PROVIDER=auto` の場合は QNN Execution Provider、DirectML、CPU の順に
+利用可能なバックエンドを選択します。Snapdragon X の NPU が使えない開発環境では
+決定的な CPU fallback で同じ制御信号を生成します。
+
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
