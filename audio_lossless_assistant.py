@@ -158,28 +158,27 @@ def build_preservation_plan(source_codec: str, target_codec: str = "flac") -> Pr
 
 def render_assessment(assessment: CodecAssessment) -> str:
     lines = [
-        f"Codec: {assessment.codec}",
-        f"Name: {assessment.codec_name}",
-        f"Known codec: {str(assessment.known_codec).lower()}",
-        f"Lossless codec: {str(assessment.is_lossless_codec).lower()}",
-        "Can restore discarded audio: "
-        f"{str(assessment.can_restore_discarded_audio).lower()}",
+        f"コーデック: {assessment.codec}",
+        f"名前: {assessment.codec_name}",
+        f"既知のコーデック: {'はい' if assessment.known_codec else 'いいえ'}",
+        f"ロスレスコーデック: {'はい' if assessment.is_lossless_codec else 'いいえ'}",
+        f"破棄された音声の復元: {'可能' if assessment.can_restore_discarded_audio else '不可'}",
         assessment.message,
-        "Recommended lossless targets: " + ", ".join(assessment.recommended_targets),
+        "推奨ロスレス保存先: " + ", ".join(assessment.recommended_targets),
     ]
     return "\n".join(lines)
 
 
 def render_plan(plan: PreservationPlan) -> str:
     lines = [
-        f"Source codec: {plan.source_codec}",
-        f"Target codec: {plan.target_codec}",
-        f"Truly lossless result: {str(plan.truly_lossless_result).lower()}",
-        f"Keep original: {str(plan.keep_original).lower()}",
+        f"入力コーデック: {plan.source_codec}",
+        f"保存先コーデック: {plan.target_codec}",
+        f"真のロスレス結果: {'はい' if plan.truly_lossless_result else 'いいえ'}",
+        f"原本を保持: {'はい' if plan.keep_original else 'いいえ'}",
     ]
     if plan.warning:
-        lines.append(f"Warning: {plan.warning}")
-    lines.append("Steps:")
+        lines.append(f"警告: {plan.warning}")
+    lines.append("手順:")
     lines.extend(f"{index}. {step}" for index, step in enumerate(plan.steps, start=1))
     return "\n".join(lines)
 

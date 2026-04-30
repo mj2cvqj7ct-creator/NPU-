@@ -113,6 +113,7 @@ def build_enhancement_plan(
         "Run artifact reduction and bandwidth extension with an auditable AI model.",
         f"Use {acceleration} for inference when available.",
         f"Export as {target_container.upper()} {bit_depth}-bit/{sample_rate // 1000} kHz.",
+        "Enable WASAPI exclusive mode to bypass the OS mixer for bit-perfect output.",
         "Tag the file as AI-enhanced, not true lossless source restoration.",
     ]
     if not is_bluetooth and assessment.is_lossless_codec:
@@ -135,23 +136,23 @@ def build_enhancement_plan(
 def render_npu_status(status: NpuStatus) -> str:
     return "\n".join(
         [
-            f"NPU available: {str(status.available).lower()}",
-            f"Provider: {status.provider}",
-            f"Detail: {status.detail}",
+            f"NPU利用可能: {'はい' if status.available else 'いいえ'}",
+            f"プロバイダー: {status.provider}",
+            f"詳細: {status.detail}",
         ]
     )
 
 
 def render_enhancement_plan(plan: EnhancementPlan) -> str:
     lines = [
-        f"Source codec: {plan.source_codec}",
-        f"Target: {plan.target_container} {plan.target_bit_depth}-bit/{plan.target_sample_rate_hz} Hz",
-        f"Acceleration: {plan.acceleration}",
-        f"NPU available: {str(plan.npu_available).lower()}",
-        f"True lossless restoration: {str(plan.true_lossless_restoration).lower()}",
-        f"Output label: {plan.output_label}",
-        f"Warning: {plan.warning}",
-        "Steps:",
+        f"入力コーデック: {plan.source_codec}",
+        f"出力先: {plan.target_container} {plan.target_bit_depth}bit/{plan.target_sample_rate_hz} Hz",
+        f"アクセラレーション: {plan.acceleration}",
+        f"NPU利用可能: {'はい' if plan.npu_available else 'いいえ'}",
+        f"真のロスレス復元: {'はい' if plan.true_lossless_restoration else 'いいえ'}",
+        f"出力ラベル: {plan.output_label}",
+        f"警告: {plan.warning}",
+        "手順:",
     ]
     lines.extend(f"{index}. {step}" for index, step in enumerate(plan.steps, start=1))
     return "\n".join(lines)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import platform
+import threading
 from typing import TYPE_CHECKING
 
 try:
@@ -85,6 +86,26 @@ class AudioDesktopApp(BaseFrame):
         self.high_res_target = tk.StringVar(value="flac-24-96")
         self.pack(fill=tk.BOTH, expand=True)
         self._build_widgets()
+
+    def _run_in_thread(
+        self,
+        target: callable,
+        output_writer: callable,
+        error_title: str = APP_TITLE,
+    ) -> None:
+        """Run *target* in a background thread, post result to the main loop."""
+
+        def _worker() -> None:
+            try:
+                result = target()
+                self.master.after(0, lambda r=result: output_writer(r))
+            except Exception as err:
+                msg = str(err)
+                self.master.after(
+                    0, lambda m=msg: messagebox.showerror(error_title, m)
+                )
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _build_widgets(self) -> None:
         self.master.title(APP_TITLE)
@@ -228,39 +249,39 @@ class AudioDesktopApp(BaseFrame):
         self.npu_output.insert(tk.END, text)
 
     def show_assessment(self) -> None:
-        try:
-            text = build_lossless_assessment_text(self.source_codec.get())
-        except ValueError as exc:
-            messagebox.showerror(APP_TITLE, str(exc))
-            return
-        self._write_lossless_output(text)
+        self._run_in_thread(
+            lambda: build_lossless_assessment_text(self.source_codec.get()),
+            self._write_lossless_output,
+        )
 
     def show_plan(self) -> None:
-        try:
-            text = build_lossless_plan_text(
+        self._run_in_thread(
+            lambda: build_lossless_plan_text(
                 self.source_codec.get(), self.target_codec.get()
-            )
-        except ValueError as exc:
-            messagebox.showerror(APP_TITLE, str(exc))
-            return
-        self._write_lossless_output(text)
+            ),
+            self._write_lossless_output,
+        )
 
     def show_windows_ldac_status(self) -> None:
-        self._write_ldac_output(build_ldac_status_text("Windows"))
+        self._run_in_thread(
+            lambda: build_ldac_status_text("Windows"),
+            self._write_ldac_output,
+        )
 
     def show_npu_status(self) -> None:
-        self._write_npu_output(build_npu_status_text())
+        self._run_in_thread(
+            lambda: build_npu_status_text(),
+            self._write_npu_output,
+        )
 
     def show_npu_plan(self) -> None:
-        try:
-            text = build_npu_enhancement_text(
+        self._run_in_thread(
+            lambda: build_npu_enhancement_text(
                 self.npu_source_codec.get(),
                 self.high_res_target.get(),
-            )
-        except ValueError as exc:
-            messagebox.showerror(APP_TITLE, str(exc))
-            return
-        self._write_npu_output(text)
+            ),
+            self._write_npu_output,
+        )
 
 
 def create_app() -> "tk_types.Tk":
