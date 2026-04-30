@@ -123,3 +123,27 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、WASAPI/APO 統合の前段階としてオフライン WAV
+で検証できる Python 実装を含めています。Spotify、Apple Music、
+YouTube Music のアプリやストリームを直接変更せず、各サービス名は
+ローカル後処理プリセットのヒントとしてだけ使います。
+
+```bash
+python -m pip install -e ".[dev]"
+snapdragon-audio-enhance input.wav output.wav --service spotify
+```
+
+主な構成:
+
+- `snapdragon_audio_enhancer.config`: サービス別の安全なローカル補正プリセット
+- `snapdragon_audio_enhancer.dsp`: ラウドネス補正、3 バンド EQ、ステレオ幅、true peak limiter
+- `snapdragon_audio_enhancer.inference`: ONNX Runtime QNN Execution Provider 優先の backend 選択と CPU fallback
+- `snapdragon_audio_enhancer.pipeline`: 20 ms フレーム単位の DSP + 推論 blend パイプライン
+- `snapdragon_audio_enhancer.wav_io`: WAV 入出力テスト用ユーティリティ
+
+Snapdragon X ARM64 Windows 上で ONNX Runtime が QNN Execution Provider を
+公開しており、`--model model.onnx` が指定された場合は NPU backend を優先します。
+利用できない環境では DirectML または CPU fallback に切り替わります。
