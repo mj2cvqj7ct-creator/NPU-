@@ -12,6 +12,9 @@ authors = [{ name = "Cursor Automation" }]
 license = { text = "Proprietary" }
 keywords = ["audio", "snapdragon", "npu", "dsp", "wasapi"]
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [project.scripts]
 snapdragon-audio-enhance = "snapdragon_audio_enhancer.cli:main"
 

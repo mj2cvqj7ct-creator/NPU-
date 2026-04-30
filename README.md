@@ -23,8 +23,8 @@ ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube
 ### 試し方
 
 ```bash
-python -m pip install -e .
-python -m pytest
+python3 -m pip install -e ".[test]"
+python3 -m pytest
 snapdragon-audio-enhance input.wav output.wav --service spotify --report-json report.json
 ```
 
