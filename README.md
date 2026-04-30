@@ -33,6 +33,8 @@ Music App
 ```bash
 python -m pip install -e .
 python -m snapdragon_audio_enhancer.cli input.wav output.wav --service spotify
+python -m pip install -e ".[test]"
+python -m pytest
 ```
 
 `SNAPDRAGON_AUDIO_BACKEND=qnn_npu`、`directml`、`cpu` を指定すると、バックエンド選択ロジックを明示的に確認できます。実際の Snapdragon X NPU 推論は ONNX Runtime QNN Execution Provider または Qualcomm QNN SDK の統合点に差し替える想定で、未設定環境では決定論的な CPU 推定器に fallback します。
