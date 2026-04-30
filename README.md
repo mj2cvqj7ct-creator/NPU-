@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモ兼プロトタイプです。
 
 ## 重要な前提
 
@@ -123,3 +123,45 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
 - `tests/`: WAV 入出力による DSP の自動テスト
+
+## 現在のプロトタイプ
+
+このリポジトリには、上記ロードマップのうちリアルタイム処理コアを検証するための Python プロトタイプを含めています。Spotify、Apple Music、YouTube Music のアプリやストリームには触れず、OS から得られた PCM 音声または WAV ファイルを後処理する設計です。
+
+```bash
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --block-size 960
+```
+
+サービス別の安全な後処理プロファイルを指定できます。これは各サービスの内部アルゴリズムを変更するものではなく、OS へ出力された PCM 音声に対して補正方針を変えるだけです。
+
+```bash
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service spotify
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service apple_music
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav --service youtube_music
+```
+
+主な構成:
+
+- `src/snapdragon_npu_audio_enhancer/audio_frame.py`: 48 kHz / stereo / float32 PCM フレーム表現
+- `src/snapdragon_npu_audio_enhancer/dsp.py`: ラウドネス推定、動的 EQ、トランジェント保護、true peak limiter
+- `src/snapdragon_npu_audio_enhancer/inference.py`: ONNX Runtime QNN Execution Provider を優先する NPU 推論バックエンドと CPU ルールベース fallback
+- `src/snapdragon_npu_audio_enhancer/pipeline.py`: DSP と推論制御値を統合したフレーム処理パイプライン
+- `src/snapdragon_npu_audio_enhancer/service_profiles.py`: Spotify、Apple Music、YouTube Music 向けのローカル補正プロファイル
+- `src/snapdragon_npu_audio_enhancer/cli.py`: WAV 入出力によるオフライン検証 CLI
+
+Snapdragon X では `--onnx-model enhancer.onnx` を指定し、ONNX Runtime が QNN Execution Provider を利用できる環境で NPU 推論を試します。モデルや QNN が利用できない場合は、CPU の安全なルールベース制御へ自動的に切り替わります。
+
+```bash
+python -m snapdragon_npu_audio_enhancer.cli input.wav output.wav \
+  --service spotify \
+  --onnx-model enhancer.onnx \
+  --block-size 960
+```
+
+プロファイルの目的:
+
+| プロファイル | 方針 |
+| --- | --- |
+| `spotify` | 正規化済み音源のヘッドルームを守りつつ、低域の締まりとボーカル明瞭度を補う |
+| `apple_music` | ロスレス再生の余裕を残し、軽い空気感とヘッドホン向けステレオ幅を加える |
+| `youtube_music` | 音源品質や音量差のばらつきを抑え、声・主旋律の聴き取りやすさを優先する |
