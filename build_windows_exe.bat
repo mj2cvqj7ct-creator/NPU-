@@ -19,9 +19,10 @@ if errorlevel 1 (
 )
 
 echo [3/3] Copying EXE to Desktop...
-set "DESKTOP=%USERPROFILE%\Desktop"
+set "DESKTOP=C:\Users\look5\Desktop"
 if not exist "%DESKTOP%" (
   echo Desktop path not found: %DESKTOP%
+  echo Hint: edit build_windows_exe.bat and change DESKTOP if your username differs.
   exit /b 1
 )
 

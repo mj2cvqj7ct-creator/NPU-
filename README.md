@@ -134,4 +134,10 @@ pyinstaller --noconfirm --windowed --name SnapdragonAudioStudio --onefile snapdr
 build_windows_exe.bat
 ```
 
+`C:\Users\look5\Desktop\` に直接出力したい場合は、次のように引数を渡して実行できます。
+
+```bat
+build_windows_exe.bat "C:\Users\look5\Desktop"
+```
+
 注意: この機能は知覚品質向上を目的とした計画支援です。音源の完全分離や不可逆圧縮で失われた元サンプルの厳密復元を保証するものではありません。
