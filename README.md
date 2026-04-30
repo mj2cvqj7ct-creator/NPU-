@@ -131,7 +131,7 @@ print(report.npu_backend, report.applied_gain_db)
 ### 検証
 
 ```bash
-python -m pytest
+PYTHONPATH=src python3 -m unittest
 ```
 
 ## 実装ロードマップ
