@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモと、ローカル PCM 処理プロトタイプです。
 
 ## 重要な前提
 
@@ -70,6 +70,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - true peak limiter
 - 曲間音量差の低減
 
+このリポジトリには Phase 1 の実行可能な Python プロトタイプを追加しています。WAV ファイルを Spotify / Apple Music / YouTube Music 風のサービス別ポリシーで処理し、NPU モデルがない環境では決定的な CPU フォールバックを使います。
+
 ### Phase 2: NPU 支援の補正
 
 - 楽曲ジャンル、音色、密度、低域量のローカル推定
@@ -100,6 +102,36 @@ Snapdragon X では、以下の順で実装候補を検討します。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
+
+## プロトタイプの実行
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+snapdragon-audio-enhance input.wav output.wav --service spotify --no-npu
+```
+
+ONNX Runtime と Snapdragon X の QNN Execution Provider を使う場合は、ONNX モデルを指定します。
+
+```bash
+pip install -e ".[onnx]"
+SNAPDRAGON_AUDIO_BACKEND=auto snapdragon-audio-enhance input.wav output.wav \
+  --service youtube_music \
+  --model models/audio_controls.onnx
+```
+
+バックエンド選択は `QNNExecutionProvider`、`DmlExecutionProvider`、CPU の順です。`SNAPDRAGON_AUDIO_BACKEND=cpu` を指定すると、開発・テスト用の CPU フォールバックに固定できます。
+
+### 実装済みモジュール
+
+- `src/snapdragon_npu_audio_enhancer/audio_frame.py`: 48 kHz stereo float PCM を扱う基本フレーム型
+- `src/snapdragon_npu_audio_enhancer/dsp.py`: 特徴抽出、動的 EQ、ステレオ幅補正、true peak limiter
+- `src/snapdragon_npu_audio_enhancer/inference.py`: QNN / DirectML / CPU の推論バックエンド選択
+- `src/snapdragon_npu_audio_enhancer/service_policy.py`: Spotify、Apple Music、YouTube Music 向けのローカル補正ポリシー
+- `src/snapdragon_npu_audio_enhancer/pipeline.py`: サービス別ポリシー、DSP、NPU 推論結果を統合するパイプライン
+- `src/snapdragon_npu_audio_enhancer/cli.py`: WAV 入出力 CLI
 
 ## 評価指標
 

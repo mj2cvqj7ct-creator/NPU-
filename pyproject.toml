@@ -1,0 +1,33 @@
+[project]
+name = "snapdragon-npu-audio-enhancer"
+version = "0.1.0"
+description = "Prototype DSP and Snapdragon X NPU audio enhancement pipeline for local PCM streams."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Cursor Automation" }]
+dependencies = [
+  "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+onnx = [
+  "onnxruntime>=1.17",
+]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+snapdragon-audio-enhance = "snapdragon_npu_audio_enhancer.cli:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
