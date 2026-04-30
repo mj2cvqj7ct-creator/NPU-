@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモと最小実装です。
 
 ## 重要な前提
 
@@ -28,6 +28,8 @@ Music App
   -> Audio Render Device
 ```
 
+このリポジトリには、上記のうち DSP Preprocess、NPU Inference のバックエンド選択、DSP Postprocess、ローカル嗜好プロファイルを Python で検証できる基盤を追加しています。WASAPI loopback / APO / QNN 実推論は次段階の統合対象で、現在の実装は同じ API のまま安全な CPU fallback で動きます。
+
 ### Audio Capture Layer
 
 - WASAPI loopback でアプリの出力をキャプチャします。
@@ -52,6 +54,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 4. CPU fallback
 
 推論モデルは小型化し、10 ms から 20 ms 程度のフレーム単位で動作させます。
+
+実装では `SnapdragonNpuBackendSelector` が ARM64 と `onnxruntime` の有無を見て `onnxruntime-qnn`、`onnxruntime-cpu`、`deterministic-cpu` を選びます。NPU SDK が未導入の開発環境でも、同じ `StreamingEnhancer` API でラウドネス、音色補正、true peak limiter を検証できます。
 
 ### DSP Postprocess
 
@@ -90,6 +94,45 @@ Snapdragon X では、以下の順で実装候補を検討します。
 | Spotify | 不可 | OS 出力音声のリアルタイム補正、ローカル嗜好プロファイル |
 | Apple Music | 不可 | ロスレス出力への後処理、ヘッドホン別補正 |
 | YouTube Music | 不可 | ブラウザまたはアプリ出力の後処理、音量差補正 |
+
+## 実装済みの基盤
+
+- `src/npu_audio_enhancer/dsp/`
+  - `AudioFrame`: 48 kHz stereo を想定した channel-major / interleaved PCM 変換
+  - `LoudnessNormalizer`: 短時間フレーム向けのラウドネス補正
+  - `DynamicToneShaper`: 低域、ボーカル帯域、空気感、ステレオ幅の軽量補正
+  - `TruePeakLimiter`: float PCM を指定 ceiling 以下へ収める保護段
+- `src/npu_audio_enhancer/inference/`
+  - `SnapdragonNpuBackendSelector`: Snapdragon X NPU / ONNX Runtime QNN を優先し、未導入時は CPU fallback
+- `src/npu_audio_enhancer/profile/`
+  - `ListeningPreference`: Spotify、Apple Music、YouTube Music を横断するローカル音作り嗜好
+- `src/npu_audio_enhancer/pipeline.py`
+  - `StreamingEnhancer`: OS からキャプチャした interleaved PCM をサービス非依存に補正する統合 API
+
+### Python API の例
+
+```python
+from npu_audio_enhancer import EnhancementSettings, StreamingEnhancer
+from npu_audio_enhancer.profile import ListeningPreference, MusicService
+
+enhancer = StreamingEnhancer(
+    EnhancementSettings(service_name="spotify"),
+    profile=ListeningPreference(
+        service=MusicService.SPOTIFY,
+        bass_preference=0.2,
+        vocal_clarity_preference=0.5,
+    ),
+)
+
+processed_samples, report = enhancer.process_interleaved(float_pcm_samples)
+print(report.npu_backend, report.applied_gain_db)
+```
+
+### 検証
+
+```bash
+python -m pytest
+```
 
 ## 実装ロードマップ
 
