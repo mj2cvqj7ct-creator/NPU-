@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon-audio-enhancer"
+version = "0.1.0"
+description = "Prototype OS-level audio enhancer for Snapdragon X NPU PCs"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Cursor Automation" }]
+
+[project.scripts]
+snapdragon-audio-enhance = "snapdragon_audio_enhancer.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

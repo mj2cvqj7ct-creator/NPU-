@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するためのプロトタイプです。
 
 ## 重要な前提
 
@@ -28,6 +28,15 @@ Music App
   -> Audio Render Device
 ```
 
+このリポジトリには、上記パイプラインをテスト可能にする Python 実装も含まれます。Windows 実機の WASAPI/APO 統合に進む前に、WAV ファイルを使ってサービス別プロファイル、DSP、NPU 推論バックエンド選択の挙動を検証できます。
+
+```bash
+python -m pip install -e .
+python -m snapdragon_audio_enhancer.cli input.wav output.wav --service spotify
+```
+
+`SNAPDRAGON_AUDIO_BACKEND=qnn_npu`、`directml`、`cpu` を指定すると、バックエンド選択ロジックを明示的に確認できます。実際の Snapdragon X NPU 推論は ONNX Runtime QNN Execution Provider または Qualcomm QNN SDK の統合点に差し替える想定で、未設定環境では決定論的な CPU 推定器に fallback します。
+
 ### Audio Capture Layer
 
 - WASAPI loopback でアプリの出力をキャプチャします。
@@ -52,6 +61,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 4. CPU fallback
 
 推論モデルは小型化し、10 ms から 20 ms 程度のフレーム単位で動作させます。
+
+現在の `src/snapdragon_audio_enhancer/inference.py` は、将来の ONNX/QNN モデルと同じ「PCM ブロックを受け取り、補正ヒントを返す」インターフェースを提供します。これにより、DSP とサービス別チューニングを先に固めつつ、Snapdragon X 実機では QNN NPU backend を優先できます。
 
 ### DSP Postprocess
 
@@ -91,6 +102,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 | Apple Music | 不可 | ロスレス出力への後処理、ヘッドホン別補正 |
 | YouTube Music | 不可 | ブラウザまたはアプリ出力の後処理、音量差補正 |
 
+実装では `src/snapdragon_audio_enhancer/profiles.py` にサービス別プロファイルを置き、直接改変ではなく capture hint と DSP パラメータだけを切り替えます。Spotify は配信音源の音量差と圧縮感、Apple Music はロスレス出力の headroom、YouTube Music はブラウザ/PWA 経由の音量差を意識した初期値にしています。
+
 ## 実装ロードマップ
 
 1. WASAPI loopback の最小プロトタイプを作る。
@@ -116,10 +129,19 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - Spotify、Apple Music、YouTube Music の推薦ランキングやアプリ内部ロジックの改変
 - すべての音源を無条件に派手に加工すること
 
+## 実装済みの基盤
+
+- `src/snapdragon_audio_enhancer/dsp.py`: loudness normalization、presence 補正、stereo width、true peak limiter
+- `src/snapdragon_audio_enhancer/inference.py`: QNN NPU / DirectML / CPU の backend 選択と NPU 置換可能な推論 facade
+- `src/snapdragon_audio_enhancer/profiles.py`: Spotify、Apple Music、YouTube Music、generic の安全な後処理プロファイル
+- `src/snapdragon_audio_enhancer/pipeline.py`: 10 ms から 20 ms ブロック想定の enhancement pipeline
+- `src/snapdragon_audio_enhancer/wav_io.py`: WAV ファイルを使った offline 検証
+- `tests/`: DSP と backend selection の自動テスト
+
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
+- Windows Audio Processing Object (APO) または仮想オーディオデバイスへの統合
+- ONNX Runtime QNN Execution Provider での実機 Snapdragon X NPU 推論
 - `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- 実機での latency、dropout、CPU/NPU 使用率測定
