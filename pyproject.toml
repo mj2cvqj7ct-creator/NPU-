@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon-npu-audio"
+version = "0.1.0"
+description = "System-wide audio enhancement prototype for Snapdragon X NPU PCs"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Cursor Agent" }]
+
+[project.scripts]
+snapdragon-npu-audio = "snapdragon_npu_audio.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
