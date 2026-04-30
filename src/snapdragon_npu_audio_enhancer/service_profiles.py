@@ -117,8 +117,16 @@ def get_service_profile(service: str | MusicService | None) -> ServiceProfile:
         "generic": MusicService.GENERIC,
     }
     try:
-        return SERVICE_PROFILES[aliases.get(normalized, MusicService(normalized))]
-    except ValueError as exc:
+        service_key = aliases[normalized]
+    except KeyError:
+        try:
+            service_key = MusicService(normalized)
+        except ValueError as exc:
+            choices = ", ".join(service.value for service in MusicService)
+            raise ValueError(f"Unsupported service '{service}'. Choose one of: {choices}.") from exc
+    try:
+        return SERVICE_PROFILES[service_key]
+    except KeyError as exc:
         choices = ", ".join(service.value for service in MusicService)
         raise ValueError(f"Unsupported service '{service}'. Choose one of: {choices}.") from exc
 

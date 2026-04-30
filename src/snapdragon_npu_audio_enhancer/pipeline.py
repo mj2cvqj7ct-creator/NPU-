@@ -26,6 +26,12 @@ class EnhancementPipeline:
     def __post_init__(self) -> None:
         self.enhancer.target_rms_db = self.service_profile.target_rms_db
 
+    @property
+    def effective_npu_mix(self) -> float:
+        """Return the configured NPU-control blend for the active profile."""
+
+        return self.service_profile.npu_mix if self.npu_mix is None else self.npu_mix
+
     @classmethod
     def for_service(
         cls,
@@ -48,8 +54,9 @@ class EnhancementPipeline:
         features = self.extractor.extract(frame)
         base_controls = self.enhancer.derive_controls(features)
         inferred_controls = self.inference_backend.infer(features)
-        mix = self.service_profile.npu_mix if self.npu_mix is None else self.npu_mix
-        controls = self.service_profile.apply(merge_controls(base_controls, inferred_controls, mix))
+        controls = self.service_profile.apply(
+            merge_controls(base_controls, inferred_controls, self.effective_npu_mix)
+        )
 
         self.last_features = features
         self.last_controls = controls
