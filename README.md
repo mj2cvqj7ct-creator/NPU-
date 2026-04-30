@@ -101,6 +101,38 @@ Snapdragon X では、以下の順で実装候補を検討します。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
 
+## 現在の最小実装
+
+このリポジトリには、Windows ARM64 / Snapdragon X ホストへ組み込む前に
+Linux CI でも検証できる純 Python のコア処理を追加しています。
+
+- `src/snapdragon_npu_audio/profiles.py`
+  - Spotify、Apple Music、YouTube Music、汎用出力向けの保守的な補正プロファイル。
+- `src/snapdragon_npu_audio/inference.py`
+  - QNN / ONNX Runtime QNN Execution Provider に置き換え可能な `EnhancementBackend` 境界。
+  - 現時点では `HeuristicNpuBackend` が短時間特徴量から NPU モデル相当の補正計画を生成します。
+- `src/snapdragon_npu_audio/dsp.py`
+  - 48 kHz stereo float PCM フレームの特徴抽出、ラウドネスゲイン、簡易ダイナミック EQ、ステレオ幅補正、true peak limiter。
+- `src/snapdragon_npu_audio/pipeline.py`
+  - `AudioFrame -> AudioFeatures -> EnhancementPlan -> DSP -> EnhancementResult` の低遅延パイプライン。
+- `tests/`
+  - サービス別プロファイル、リミッター、バックエンド差し替え、無効 PCM 入力の自動テスト。
+
+使用例:
+
+```python
+from snapdragon_npu_audio import AudioEnhancementPipeline, AudioFrame
+
+frame = AudioFrame.from_stereo_pairs([(0.1, -0.1), (0.2, -0.18)])
+pipeline = AudioEnhancementPipeline(service="spotify")
+result = pipeline.process(frame)
+enhanced_pcm = result.frame.samples
+```
+
+実 NPU 対応では `EnhancementBackend` を実装し、短時間特徴量を QNN / ONNX
+Runtime QNN Execution Provider の入力テンソルへ変換します。DSP とサービス別の
+安全制約はそのまま利用できます。
+
 ## 評価指標
 
 - エンドツーエンド遅延: 40 ms 未満を目標
