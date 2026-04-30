@@ -28,6 +28,28 @@ Music App
   -> Audio Render Device
 ```
 
+## 現在のプロトタイプ
+
+このリポジトリには、上記アーキテクチャのうち、サービス横断で再利用できる Python の最小コアを含めています。
+
+- `snapdragon_audio_enhancer.pipeline.AudioEnhancementPipeline`
+  - 48 kHz / stereo PCM を想定したフレーム単位の後処理。
+  - ラウドネス補正、簡易トーンシェイプ、ステレオ幅補正、true peak ceiling を提供。
+  - NaN / infinity などの不正サンプルをサニタイズし、出力を安全な範囲に制限。
+- `snapdragon_audio_enhancer.inference.InferenceEngine`
+  - Snapdragon X + ARM64 + QNN Execution Provider がある場合に NPU 経路を選択。
+  - QNN がない場合は DirectML、最後に CPU fallback を選択。
+  - 実機の ONNX / QNN モデルを差し替えやすいよう、DSP 制御値だけを返す薄い境界にしています。
+- `PresenceEnhancementModel`
+  - 実 NPU モデルがない開発環境でもテストできる決定的なフォールバックモデル。
+  - 欠落した音源情報を復元するものではなく、明瞭度補正の制御信号を安定して生成するための仮実装です。
+
+ローカルでの確認:
+
+```bash
+PYTHONPATH=src python -m unittest
+```
+
 ### Audio Capture Layer
 
 - WASAPI loopback でアプリの出力をキャプチャします。
