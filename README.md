@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するためのプロトタイプです。
 
 ## 重要な前提
 
@@ -77,6 +77,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 - 過度な圧縮音源に対するトランジェント復元風補正
 - 小音量再生時の聴感補正
 
+このリポジトリには、上記パイプラインを WAV ファイルで検証できる Python 実装を含めています。短時間 PCM フレームから RMS、ピーク、帯域エネルギー、ステレオ相関を抽出し、ルールベース DSP と ONNX Runtime 推論結果をミックスして、低域、プレゼンス、エア、ステレオ幅、コンプレッサー、true peak limiter を制御します。
+
 ### Phase 3: 個人化
 
 - ユーザーが選んだプリセット、スキップ傾向、音量傾向をローカルで特徴化
@@ -90,6 +92,37 @@ Snapdragon X では、以下の順で実装候補を検討します。
 | Spotify | 不可 | OS 出力音声のリアルタイム補正、ローカル嗜好プロファイル |
 | Apple Music | 不可 | ロスレス出力への後処理、ヘッドホン別補正 |
 | YouTube Music | 不可 | ブラウザまたはアプリ出力の後処理、音量差補正 |
+
+実装上は `--service spotify`、`--service apple_music`、`--service youtube_music` で、各サービスからレンダリング済みの PCM に対する補正バイアスを選択できます。これは DRM やアプリ内部アルゴリズムを変更せず、ローカルの音作りだけを変えるものです。
+
+## プロトタイプの使い方
+
+```bash
+python -m pip install -e ".[test]"
+python -m snapdragon_npu_audio_enhancer input.wav output.wav --service spotify
+```
+
+Snapdragon X の NPU 向け ONNX モデルを試す場合は、ONNX Runtime の QNN Execution Provider を優先します。
+
+```bash
+python -m pip install -e ".[onnx,test]"
+python -m snapdragon_npu_audio_enhancer input.wav output.wav \
+  --service youtube_music \
+  --onnx-model models/enhancer_controls.onnx \
+  --provider qnn
+```
+
+`--provider directml` または `--provider cpu` も選択できます。モデルがない場合や ONNX Runtime が利用できない場合は、同じ 8 個の DSP control contract を返す決定的な CPU fallback を使います。
+
+### 実装済みモジュール
+
+- `src/snapdragon_npu_audio_enhancer/audio_frame.py`: 48 kHz / float PCM フレーム表現
+- `src/snapdragon_npu_audio_enhancer/dsp.py`: 特徴抽出、ダイナミック EQ、コンプレッション、true peak limiter
+- `src/snapdragon_npu_audio_enhancer/inference.py`: ONNX Runtime QNN / DirectML / CPU provider と fallback
+- `src/snapdragon_npu_audio_enhancer/services.py`: Spotify、Apple Music、YouTube Music 別の安全な補正プロファイル
+- `src/snapdragon_npu_audio_enhancer/pipeline.py`: 10-20 ms ブロック単位の低遅延パイプライン
+- `src/snapdragon_npu_audio_enhancer/wav_io.py`: 16/24/32-bit PCM WAV のオフライン検証入出力
+- `tests/`: DSP、推論 hook、サービス別パイプラインの自動テスト
 
 ## 実装ロードマップ
 
@@ -119,7 +152,5 @@ Snapdragon X では、以下の順で実装候補を検討します。
 ## 次に作るもの
 
 - `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
 - `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- Windows APO または仮想オーディオデバイスへの統合
