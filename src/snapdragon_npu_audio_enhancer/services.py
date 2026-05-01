@@ -135,7 +135,7 @@ def get_service_profile(service: StreamingService | str | None = None) -> Servic
     }
     normalized = str(service).strip().lower()
     try:
-        key = aliases.get(normalized, StreamingService(normalized))
+        key = aliases[normalized] if normalized in aliases else StreamingService(normalized)
     except ValueError as exc:
         supported = ", ".join(item.value for item in StreamingService)
         raise ValueError(f"Unsupported service '{service}'. Choose one of: {supported}") from exc

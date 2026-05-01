@@ -107,7 +107,7 @@ Snapdragon X の NPU 向け ONNX モデルを試す場合は、ONNX Runtime の 
 ```bash
 python -m pip install -e ".[onnx,test]"
 python -m snapdragon_npu_audio_enhancer input.wav output.wav \
-  --service youtube_music \
+  --service youtube-music \
   --onnx-model models/enhancer_controls.onnx \
   --provider qnn
 ```
