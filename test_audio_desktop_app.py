@@ -40,6 +40,31 @@ class AudioDesktopAppTest(unittest.TestCase):
         self.assertIn("True lossless restoration: false", text)
         self.assertIn("ai-enhanced-high-res-preservation", text)
 
+    def test_snapdragon_studio_plan_text_mentions_service_and_xmos(self):
+        text = app.build_streaming_studio_plan_text(
+            "spotify",
+            user_id="listener-a",
+            provider="QNNExecutionProvider",
+        )
+
+        self.assertIn("Service: spotify", text)
+        self.assertIn("XMOS low-latency plan:", text)
+        self.assertIn("provider=QNNExecutionProvider", text)
+        self.assertIn("Windows EXE build:", text)
+
+    def test_snapdragon_recommendation_update_text_returns_bias_json(self):
+        text = app.build_streaming_recommendation_update_text(
+            "listener-a",
+            clarity=0.9,
+            depth=0.8,
+            vocal=0.95,
+            bass=0.7,
+        )
+
+        self.assertIn("Realtime recommendation updated for user: listener-a", text)
+        self.assertIn("Updates: 1", text)
+        self.assertIn("Bias: acoustic=", text)
+
 
 if __name__ == "__main__":
     unittest.main()

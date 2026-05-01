@@ -104,10 +104,40 @@ ONNX Runtime の NPU 実行プロバイダーが見つかれば NPU 利用計画
 
 ## デスクトップアプリ
 
-Tkinter GUI でロスレス判定、AI/NPU補完計画、Windows LDAC 診断を操作できます。
+Tkinter GUI でロスレス判定、AI/NPU補完計画、Windows LDAC 診断、Snapdragon X Streaming Studio（3サービス向け空間音響/NPU/XMOS/レコメンド更新）を操作できます。
 
 ```bash
 python3 audio_desktop_app.py
 ```
 
 Linux デスクトップ環境では `audio-lossless-assistant.desktop` をデスクトップへコピーして、必要に応じて実行権限を付けてください。
+
+## Snapdragon X Streaming Studio
+
+ARM64 Snapdragon X を想定し、Spotify / Apple Music / YouTube Music 向けに、定位・音場・ホログラフィック感・奥行き・楽器分離・ボーカルフォーカスを重視したリアルタイム処理計画を作成できます。SABAJ A20D(ES) (XMOS USB DAC) 向けに低遅延バッファ推奨値も計算し、レコメンド埋め込みをリアルタイム更新できます。
+
+```bash
+python3 snapdragon_streaming_studio.py plan --service spotify --user-id listener-a --provider QNNExecutionProvider
+python3 snapdragon_streaming_studio.py plan --service apple-music --output ./studio_plan.json
+python3 snapdragon_streaming_studio.py update-rec --user-id listener-a --clarity 0.95 --depth 0.82 --vocal 0.91 --bass 0.72
+```
+
+Windows EXE は Windows on ARM64 環境で次のコマンドで生成できます。
+
+```bash
+pyinstaller --noconfirm --windowed --name SnapdragonAudioStudio --onefile snapdragon_streaming_studio.py
+```
+
+または、依存導入からデスクトップ配置まで一括で行う場合は、Windows PowerShell/CMD で次を実行してください。
+
+```bat
+build_windows_exe.bat
+```
+
+`C:\Users\look5\Desktop\` に直接出力したい場合は、次のように引数を渡して実行できます。
+
+```bat
+build_windows_exe.bat "C:\Users\look5\Desktop"
+```
+
+注意: この機能は知覚品質向上を目的とした計画支援です。音源の完全分離や不可逆圧縮で失われた元サンプルの厳密復元を保証するものではありません。
