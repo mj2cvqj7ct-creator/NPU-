@@ -22,6 +22,12 @@ int main(int argc, char **argv) {
     return 2;
   }
 
+  if (((argc - 3) % 2) != 0) {
+    std::cerr << "Options must be provided as flag/value pairs.\n";
+    printUsage(argv[0]);
+    return 2;
+  }
+
   npu_audio::EnhancementProfile profile{};
   for (int index = 3; index + 1 < argc; index += 2) {
     const std::string option = argv[index];
