@@ -63,6 +63,36 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 ## 音質改善パイプライン
 
+## このリポジトリに含まれるプロトタイプ
+
+このブランチでは、設計メモに加えてビルド可能な C++20 プロトタイプを追加しています。
+
+- `src/dsp/`: ラウドネス/ピーク解析、低域・明瞭度補正、ステレオ幅制御、軽量コンプレッサ、true peak limiter
+- `src/inference/`: Snapdragon X NPU 向け QNN、DirectML、CPU fallback を切り替える推論バックエンド境界
+- `src/io/`: WAV 入出力
+- `tools/npu_audio_enhance`: WAV ファイルに対して処理チェーンを適用する CLI
+- `tests/`: DSP とバックエンド選択の自動テスト
+
+### ビルドとテスト
+
+```bash
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Snapdragon X / ARM64 Windows で QNN 向けにビルドする場合は、Qualcomm AI Engine Direct SDK / QNN と ONNX Runtime QNN EP を組み込む実装を `src/inference/` の境界に接続します。現時点の portable build では外部 SDK なしで動作する CPU heuristic に fallback します。
+
+```bash
+cmake -S . -B build-arm64 -DNPU_AUDIO_ENABLE_QNN=ON
+```
+
+WAV ファイルを処理する例:
+
+```bash
+./build/npu_audio_enhance input.wav output.wav --target-db -18 --bass 0.05 --clarity 0.10 --width 1.05
+```
+
 ### Phase 1: ルールベース補正
 
 - EBU R128 準拠のラウドネス正規化
