@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace npu_audio {
 namespace {

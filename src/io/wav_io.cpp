@@ -60,18 +60,24 @@ void writeU32(std::ostream &stream, std::uint32_t value) {
   return std::memcmp(id.data(), expected, id.size()) == 0;
 }
 
+[[nodiscard]] std::uint32_t byteAt(const std::vector<unsigned char> &data,
+                                   std::size_t offset) noexcept {
+  return static_cast<std::uint32_t>(data[offset]);
+}
+
 [[nodiscard]] float decodePcmSample(const std::vector<unsigned char> &data,
                                     std::size_t offset,
                                     std::uint16_t bitsPerSample) {
   if (bitsPerSample == 16) {
     const auto raw = static_cast<std::int16_t>(
-        data[offset] | static_cast<std::uint16_t>(data[offset + 1] << 8U));
+        byteAt(data, offset) | (byteAt(data, offset + 1) << 8U));
     return std::max(-1.0F, static_cast<float>(raw) / 32768.0F);
   }
 
   if (bitsPerSample == 24) {
     std::int32_t raw = static_cast<std::int32_t>(
-        data[offset] | (data[offset + 1] << 8U) | (data[offset + 2] << 16U));
+        byteAt(data, offset) | (byteAt(data, offset + 1) << 8U) |
+        (byteAt(data, offset + 2) << 16U));
     if ((raw & 0x00800000) != 0) {
       raw |= static_cast<std::int32_t>(0xFF000000);
     }
@@ -80,8 +86,9 @@ void writeU32(std::ostream &stream, std::uint32_t value) {
 
   if (bitsPerSample == 32) {
     const auto raw = static_cast<std::int32_t>(
-        data[offset] | (data[offset + 1] << 8U) | (data[offset + 2] << 16U) |
-        (data[offset + 3] << 24U));
+        byteAt(data, offset) | (byteAt(data, offset + 1) << 8U) |
+        (byteAt(data, offset + 2) << 16U) |
+        (byteAt(data, offset + 3) << 24U));
     return std::max(-1.0F, static_cast<float>(raw) / 2147483648.0F);
   }
 
@@ -92,8 +99,9 @@ void writeU32(std::ostream &stream, std::uint32_t value) {
                                       std::size_t offset) {
   float value = 0.0F;
   std::uint32_t raw = static_cast<std::uint32_t>(
-      data[offset] | (data[offset + 1] << 8U) | (data[offset + 2] << 16U) |
-      (data[offset + 3] << 24U));
+      byteAt(data, offset) | (byteAt(data, offset + 1) << 8U) |
+      (byteAt(data, offset + 2) << 16U) |
+      (byteAt(data, offset + 3) << 24U));
   std::memcpy(&value, &raw, sizeof(value));
   return std::clamp(value, -4.0F, 4.0F);
 }
