@@ -90,8 +90,10 @@ cmake -S . -B build-arm64 -DNPU_AUDIO_ENABLE_QNN=ON
 WAV ファイルを処理する例:
 
 ```bash
-./build/npu_audio_enhance input.wav output.wav --target-db -18 --bass 0.05 --clarity 0.10 --width 1.05
+./build/npu_audio_enhance input.wav output.wav --service spotify --clarity 0.10 --width 1.05
 ```
+
+`--service` には `spotify`、`apple-music`、`youtube-music`、`generic` を指定できます。実アプリの DRM や内部アルゴリズムは変更せず、OS から取得した PCM 音声に対するローカル後処理の音作りだけを切り替えます。
 
 ### Phase 1: ルールベース補正
 
@@ -120,19 +122,6 @@ WAV ファイルを処理する例:
 | Spotify | 不可 | OS 出力音声のリアルタイム補正、ローカル嗜好プロファイル | 圧縮済み音源に余白を残しつつ明瞭度と低域の量感を補う |
 | Apple Music | 不可 | ロスレス出力への後処理、ヘッドホン別補正 | ダイナミクスを残し、控えめな EQ と limiter で原音寄りに整える |
 | YouTube Music | 不可 | ブラウザまたはアプリ出力の後処理、音量差補正 | 動画由来の音量差と高域不足を補正し、true peak の余裕を広めに取る |
-
-## 現在のプロトタイプ
-
-このリポジトリには、ロードマップの土台として C++20 のオフライン WAV プロトタイプを含めています。
-
-```bash
-cmake -S . -B build -DCMAKE_CXX_COMPILER=/usr/bin/g++
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-./build/npu_audio_enhance input.wav output.wav --service spotify
-```
-
-`--service` には `spotify`、`apple-music`、`youtube-music`、`generic` を指定できます。実アプリの DRM や内部アルゴリズムは変更せず、OS から取得した PCM 音声に対するローカル後処理の音作りだけを切り替えます。
 
 ## 実装ロードマップ
 
