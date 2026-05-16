@@ -5,12 +5,14 @@
 #include "npu_audio/processing_types.hpp"
 
 #include <memory>
+#include <string_view>
 
 namespace npu_audio {
 
 [[nodiscard]] float linearToDb(float value) noexcept;
 [[nodiscard]] float dbToLinear(float valueDb) noexcept;
 [[nodiscard]] AudioFeatures analyzeAudio(const AudioBuffer &buffer);
+[[nodiscard]] EnhancementProfile profileForService(std::string_view serviceName);
 
 class AudioEnhancer {
 public:
