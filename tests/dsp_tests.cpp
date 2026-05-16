@@ -90,6 +90,32 @@ void testFeatureAnalysis() {
          "dual-mono sine should be highly correlated");
 }
 
+void testServiceProfiles() {
+  const npu_audio::EnhancementProfile generic =
+      npu_audio::profileForService("generic");
+  const npu_audio::EnhancementProfile spotify =
+      npu_audio::profileForService("Spotify");
+  const npu_audio::EnhancementProfile apple =
+      npu_audio::profileForService("apple-music");
+  const npu_audio::EnhancementProfile youtube =
+      npu_audio::profileForService("YouTube Music");
+
+  expect(spotify.clarityEnhancement > generic.clarityEnhancement,
+         "Spotify preset should add clarity headroom");
+  expect(apple.compressorRatio < youtube.compressorRatio,
+         "Apple Music preset should preserve more dynamics than YouTube Music");
+  expect(youtube.limiterCeilingDb < generic.limiterCeilingDb,
+         "YouTube Music preset should leave extra limiter margin");
+
+  bool threw = false;
+  try {
+    (void)npu_audio::profileForService("unknown-service");
+  } catch (const std::invalid_argument &) {
+    threw = true;
+  }
+  expect(threw, "unknown service names should be rejected");
+}
+
 } // namespace
 
 int main() {
@@ -98,6 +124,7 @@ int main() {
     testSilenceIsStable();
     testBackendSelectionFallback();
     testFeatureAnalysis();
+    testServiceProfiles();
   } catch (const std::exception &error) {
     std::cerr << "test failure: " << error.what() << '\n';
     return 1;

@@ -1,9 +1,12 @@
 #include "npu_audio/enhancer.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace npu_audio {
@@ -27,6 +30,19 @@ constexpr float kPi = 3.14159265358979323846F;
              : 0.0F;
 }
 
+[[nodiscard]] std::string normalizeServiceName(std::string_view serviceName) {
+  std::string normalized;
+  normalized.reserve(serviceName.size());
+  for (const char value : serviceName) {
+    const auto character = static_cast<unsigned char>(value);
+    if (std::isspace(character) != 0 || character == '-' || character == '_') {
+      continue;
+    }
+    normalized.push_back(static_cast<char>(std::tolower(character)));
+  }
+  return normalized;
+}
+
 } // namespace
 
 float linearToDb(float value) noexcept {
@@ -38,6 +54,55 @@ float linearToDb(float value) noexcept {
 
 float dbToLinear(float valueDb) noexcept {
   return std::pow(10.0F, valueDb / 20.0F);
+}
+
+EnhancementProfile profileForService(std::string_view serviceName) {
+  EnhancementProfile profile{};
+  const std::string normalized = normalizeServiceName(serviceName);
+  if (normalized.empty() || normalized == "generic" || normalized == "auto") {
+    return profile;
+  }
+
+  if (normalized == "spotify") {
+    profile.targetLoudnessDb = -17.5F;
+    profile.maxPositiveGainDb = 7.5F;
+    profile.bassEnhancement = 0.04F;
+    profile.clarityEnhancement = 0.07F;
+    profile.stereoWidth = 1.03F;
+    profile.compressorThresholdDb = -14.0F;
+    profile.compressorRatio = 1.35F;
+    profile.limiterCeilingDb = -1.2F;
+    return profile;
+  }
+
+  if (normalized == "apple" || normalized == "applemusic" ||
+      normalized == "applelossless") {
+    profile.targetLoudnessDb = -18.5F;
+    profile.maxPositiveGainDb = 6.5F;
+    profile.bassEnhancement = 0.02F;
+    profile.clarityEnhancement = 0.04F;
+    profile.stereoWidth = 1.0F;
+    profile.compressorThresholdDb = -11.0F;
+    profile.compressorRatio = 1.25F;
+    profile.limiterCeilingDb = -1.0F;
+    return profile;
+  }
+
+  if (normalized == "youtube" || normalized == "youtubemusic" ||
+      normalized == "ytmusic") {
+    profile.targetLoudnessDb = -17.0F;
+    profile.maxPositiveGainDb = 8.0F;
+    profile.bassEnhancement = 0.03F;
+    profile.clarityEnhancement = 0.10F;
+    profile.stereoWidth = 1.02F;
+    profile.compressorThresholdDb = -15.0F;
+    profile.compressorRatio = 1.55F;
+    profile.limiterCeilingDb = -1.3F;
+    return profile;
+  }
+
+  throw std::invalid_argument("unknown service profile: " +
+                              std::string(serviceName));
 }
 
 AudioFeatures analyzeAudio(const AudioBuffer &buffer) {
