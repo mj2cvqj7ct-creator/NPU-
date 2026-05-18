@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するためのプロトタイプです。
 
 ## 重要な前提
 
@@ -8,6 +8,40 @@ ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube
 - 実装対象は、各アプリから OS に出力された PCM 音声を取得し、低遅延で補正して再生デバイスへ戻す「システムワイド音声エンハンサー」です。
 - Snapdragon X の NPU は、ニューラル音声補正、軽量超解像、楽曲特徴抽出、ユーザー嗜好推定などの推論処理に使います。
 - DRM、各サービスの利用規約、プライバシーを尊重し、録音保存やストリームの再配布は行いません。
+
+## 現在の実装
+
+このリポジトリには、実機の WASAPI/APO 接続や QNN SDK 依存を入れる前段階として、外部依存なしで検証できる C++17 のコア処理を追加しています。
+
+- `src/dsp/`: 48 kHz stereo float ブロックのラウドネス解析、サービス別メイクアップゲイン、動的 EQ、トランジェント補正、true peak 風リミッター
+- `src/inference/`: Snapdragon X NPU 向け QNN / ONNX Runtime QNN / DirectML / CPU fallback のバックエンド選択境界
+- `src/profile/`: Spotify、Apple Music、YouTube Music ごとの安全な音質補正プロファイル
+- `src/audio_capture/`: WASAPI loopback 実装を差し込むための capture interface
+- `tests/`: DSP パイプラインとバックエンド選択の自動テスト
+
+### ビルドとテスト
+
+```bash
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+デモは合成音を処理し、選択されたバックエンドと処理前後の RMS/peak を表示します。
+
+```bash
+./build/sxnae_demo spotify
+./build/sxnae_demo "Apple Music"
+./build/sxnae_demo youtube_music
+```
+
+NPU ランタイムが組み込まれるまでは CPU fallback が選ばれます。実機統合時の選択テストには次の環境変数を使います。
+
+```bash
+SXNAE_ENABLE_QNN_HTP=1 ./build/sxnae_demo spotify
+SXNAE_ENABLE_ONNX_QNN=1 ./build/sxnae_demo youtube_music
+SXNAE_ENABLE_DIRECTML=1 ./build/sxnae_demo "Apple Music"
+```
 
 ## 目標
 
@@ -52,6 +86,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 4. CPU fallback
 
 推論モデルは小型化し、10 ms から 20 ms 程度のフレーム単位で動作させます。
+
+現行コードでは `InferenceEngine` が入力音声の RMS、crest factor、clip 状態、サービス別プロファイルから `NeuralControls` を生成します。QNN/ONNX Runtime QNN 実装を追加する場合も、DSP 側には同じ control surface を渡すことで置き換えられます。
 
 ### DSP Postprocess
 
@@ -118,8 +154,8 @@ Snapdragon X では、以下の順で実装候補を検討します。
 
 ## 次に作るもの
 
-- `src/audio_capture/`: WASAPI loopback capture
-- `src/dsp/`: EQ、limiter、loudness normalization
-- `src/inference/`: ONNX Runtime QNN integration
-- `src/profile/`: ローカル個人化プロファイル
-- `tests/`: WAV 入出力による DSP の自動テスト
+- `src/audio_capture/`: `WasapiLoopbackCapture` の Windows 実装
+- `src/inference/`: ONNX Runtime QNN Execution Provider と Qualcomm QNN HTP backend の実装
+- `src/profile/`: ローカル個人化プロファイルの暗号化保存
+- `tests/`: WAV 入出力による golden test と latency regression
+- APO 化または仮想オーディオデバイス化
