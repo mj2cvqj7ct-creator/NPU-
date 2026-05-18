@@ -1,0 +1,10 @@
+[package]
+name = "snapdragon-npu-audio-enhancer"
+version = "0.1.0"
+edition = "2021"
+description = "Realtime PCM audio enhancement core for Snapdragon X ARM64/NPU systems"
+license = "MIT"
+
+[lib]
+name = "snapdragon_npu_audio_enhancer"
+path = "src/lib.rs"

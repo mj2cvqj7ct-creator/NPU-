@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するためのプロトタイプです。
 
 ## 重要な前提
 
@@ -27,6 +27,8 @@ Music App
   -> DSP Postprocess
   -> Audio Render Device
 ```
+
+このリポジトリには、まずサービス非依存の PCM 後処理コアを Rust ライブラリとして実装しています。WASAPI loopback/APO への接続は次段階ですが、`src/` 配下のエンジンは 48 kHz / 32-bit float stereo のフレームを直接処理できるため、キャプチャ層や仮想オーディオデバイスからそのまま利用できます。
 
 ### Audio Capture Layer
 
@@ -94,12 +96,26 @@ Snapdragon X では、以下の順で実装候補を検討します。
 ## 実装ロードマップ
 
 1. WASAPI loopback の最小プロトタイプを作る。
-2. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。
-3. ルールベースのラウドネス補正、EQ、limiter を追加する。
+2. 48 kHz stereo のリングバッファと低遅延 DSP チェーンを実装する。 **(一部実装済み: `src/dsp.rs`, `src/engine.rs`)**
+3. ルールベースのラウドネス補正、EQ、limiter を追加する。 **(実装済み: ラウドネス、動的トーン補正、ステレオ幅補正、true peak limiter)**
 4. ONNX Runtime QNN Execution Provider で ARM64 / Snapdragon X NPU 推論を試す。
-5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
+5. NPU が使えない環境では DirectML または CPU fallback に切り替える。 **(一部実装済み: `src/inference.rs` の backend selection と CPU fallback)**
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
+
+## 現在の実装
+
+- `src/engine.rs`: Spotify / Apple Music / YouTube Music などの OS 出力 PCM を想定した高レベル処理エンジン。
+- `src/dsp.rs`: 短時間特徴抽出、ラウドネス正規化、動的 EQ 風トーン補正、ステレオ幅制御、true peak limiter。
+- `src/inference.rs`: Snapdragon X NPU(QNN) を優先する backend selection と、非対応環境の CPU heuristic fallback。
+- `src/profile.rs`: サービス別の安全な初期プロファイルとローカル個人化パラメータ。
+- `tests/pipeline.rs`: WAV/キャプチャ層に依存しない PCM フレーム処理の自動テスト。
+
+### 開発用コマンド
+
+```bash
+cargo test
+```
 
 ## 評価指標
 
