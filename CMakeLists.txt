@@ -10,6 +10,7 @@ option(NPU_AUDIO_ENABLE_QNN "Enable Qualcomm QNN backend selection hooks" OFF)
 
 add_library(npu_audio_enhancer
   src/dsp/enhancer.cpp
+  src/dsp/realtime_enhancer.cpp
   src/inference/backend.cpp
   src/io/wav_io.cpp)
 

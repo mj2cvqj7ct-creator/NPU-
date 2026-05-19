@@ -1,5 +1,6 @@
 #include "npu_audio/enhancer.hpp"
 #include "npu_audio/inference_backend.hpp"
+#include "npu_audio/realtime_enhancer.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -116,6 +117,57 @@ void testServiceProfiles() {
   expect(threw, "unknown service names should be rejected");
 }
 
+void testRealtimeFrameProcessor() {
+  npu_audio::RealtimeConfig config;
+  config.sampleRate = 48000;
+  config.channels = 2;
+  config.frameDurationMs = 10.0F;
+  config.userProfile = npu_audio::profileForService("youtube-music");
+
+  npu_audio::RealtimeEnhancer enhancer(config);
+  expect(enhancer.frameSize() == 480,
+         "10 ms realtime frame should map to 480 frames at 48 kHz");
+
+  npu_audio::AudioBuffer frame = makeStereoSine(1.25F, 997.0F, 48000, 480);
+  const npu_audio::RealtimeReport report = enhancer.processFrame(frame);
+  const npu_audio::AudioFeatures output = npu_audio::analyzeAudio(frame);
+
+  expect(report.processedFrames == 480,
+         "realtime report should expose processed frame count");
+  expect(report.frameDurationMs > 9.9F && report.frameDurationMs < 10.1F,
+         "realtime report should expose the processed frame duration");
+  expect(output.peakDb <= -1.15F,
+         "realtime limiter should keep output below the service ceiling");
+  expect(report.enhancement.outputPeakDb <= -1.15F,
+         "realtime report should expose the limited output peak");
+}
+
+void testRealtimeFrameValidation() {
+  bool rejectedDuration = false;
+  try {
+    npu_audio::RealtimeConfig config;
+    config.frameDurationMs = 25.0F;
+    npu_audio::RealtimeEnhancer enhancer(config);
+    (void)enhancer;
+  } catch (const std::invalid_argument &) {
+    rejectedDuration = true;
+  }
+  expect(rejectedDuration,
+         "realtime processor should reject frames outside the NPU budget");
+
+  npu_audio::RealtimeEnhancer enhancer;
+  npu_audio::AudioBuffer oversized =
+      makeStereoSine(0.25F, 440.0F, 48000, enhancer.frameSize() + 1);
+  bool rejectedOversizedFrame = false;
+  try {
+    (void)enhancer.processFrame(oversized);
+  } catch (const std::invalid_argument &) {
+    rejectedOversizedFrame = true;
+  }
+  expect(rejectedOversizedFrame,
+         "realtime processor should reject frames over the configured size");
+}
+
 } // namespace
 
 int main() {
@@ -125,6 +177,8 @@ int main() {
     testBackendSelectionFallback();
     testFeatureAnalysis();
     testServiceProfiles();
+    testRealtimeFrameProcessor();
+    testRealtimeFrameValidation();
   } catch (const std::exception &error) {
     std::cerr << "test failure: " << error.what() << '\n';
     return 1;

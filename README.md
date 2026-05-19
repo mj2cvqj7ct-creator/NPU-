@@ -68,6 +68,7 @@ Snapdragon X では、以下の順で実装候補を検討します。
 このブランチでは、設計メモに加えてビルド可能な C++20 プロトタイプを追加しています。
 
 - `src/dsp/`: ラウドネス/ピーク解析、低域・明瞭度補正、ステレオ幅制御、軽量コンプレッサ、true peak limiter
+- `include/npu_audio/realtime_enhancer.hpp`: Snapdragon X NPU の 10〜20 ms 推論フレームに合わせた状態保持型リアルタイム処理 API
 - `src/inference/`: Snapdragon X NPU 向け QNN、DirectML、CPU fallback を切り替える推論バックエンド境界
 - `src/io/`: WAV 入出力
 - `tools/npu_audio_enhance`: WAV ファイルに対して処理チェーンを適用する CLI
@@ -94,6 +95,8 @@ WAV ファイルを処理する例:
 ```
 
 `--service` には `spotify`、`apple-music`、`youtube-music`、`generic` を指定できます。実アプリの DRM や内部アルゴリズムは変更せず、OS から取得した PCM 音声に対するローカル後処理の音作りだけを切り替えます。
+
+リアルタイム統合では `npu_audio::RealtimeEnhancer` を使い、WASAPI loopback や APO から受け取った 10〜20 ms の 48 kHz stereo float frame を処理します。この API はフレーム間で EQ フィルタ、コンプレッサ、ラウドネスゲイン、NPU 推定プロファイルを平滑化し、短い推論フレームでもクリックや音量揺れが出にくいようにします。
 
 ### Phase 1: ルールベース補正
 
