@@ -1,6 +1,6 @@
 # Snapdragon X NPU Audio Enhancer
 
-ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモです。
+ARM64 Snapdragon X 搭載 PC の NPU を使い、Spotify、Apple Music、YouTube Music などの再生音を OS レベルで後処理して音質を改善するための設計メモ兼プロトタイプです。
 
 ## 重要な前提
 
@@ -100,6 +100,25 @@ Snapdragon X では、以下の順で実装候補を検討します。
 5. NPU が使えない環境では DirectML または CPU fallback に切り替える。
 6. ローカル個人化プロファイルを暗号化保存する。
 7. APO 化または仮想オーディオデバイス化して常用できる形にする。
+
+## 現在のプロトタイプ
+
+このリポジトリには、リアルタイム APO/WASAPI 実装の前段として検証できる Python プロトタイプを含めています。
+
+- `src/npu_audio_enhancer/dsp.py`: ラウドネス補正、簡易トーン補正、ステレオ幅制御、true peak limiter
+- `src/npu_audio_enhancer/inference.py`: Snapdragon X ARM64 では ONNX Runtime `QNNExecutionProvider` を優先し、DirectML/CPU へ fallback する選択ロジック
+- `src/npu_audio_enhancer/service_profiles.py`: Spotify、Apple Music、YouTube Music ごとの後処理プロファイル
+- `src/npu_audio_enhancer/cli.py`: 16-bit PCM stereo WAV をオフラインで補正する検証 CLI
+- `tests/`: DSP と NPU backend 選択の自動テスト
+
+### オフライン検証
+
+```bash
+python -m unittest discover -s tests
+python -m npu_audio_enhancer.cli input.wav output.wav --service spotify --backend-info
+```
+
+`onnxruntime` と QNN provider が導入された Snapdragon X ARM64 環境では、backend 選択が `qnn-npu` になります。現段階の `HeuristicFeatureModel` は量子化 ONNX モデルが用意されるまでのローカル代替で、外部サービスへ音声や特徴量を送信しません。
 
 ## 評価指標
 
